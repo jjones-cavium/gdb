@@ -25,6 +25,7 @@ struct captured_main_args
   int argc;
   char **argv;
   int use_windows;
+  const char *interpreter_p;
 };
 
 extern int gdb_main (struct captured_main_args *);

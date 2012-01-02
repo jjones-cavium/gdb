@@ -1,5 +1,14 @@
 2012-01-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
+	Revert this part of:
+	2012-01-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	Remove the gdbtui binary.
+	* gdb.c (main): Remove args.interpreter_p initialization.
+	* main.c (captured_main): Set INTERPRETER_P directly by INTERP_CONSOLE.
+	* main.h (struct captured_main_args): Remove interpreter_p.
+
+2012-01-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
 	Remove the gdbtui binary.
 	* .gitignore (/gdbtui): Remove.
 	* Makefile.in (TUI): Remove.
