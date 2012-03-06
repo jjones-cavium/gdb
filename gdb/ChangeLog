@@ -1,3 +1,8 @@
+2012-03-06  Joel Brobecker  <brobecker@adacore.com>
+
+	* dwarf2read.c (dwarf2_get_die_type): Pass absolute offset
+	in call to get_die_type_at_offset.
+
 2012-01-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Revert this part of:
