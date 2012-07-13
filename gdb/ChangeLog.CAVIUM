@@ -1,5 +1,12 @@
 2012-07-12  Chandrakala Chavva  <cchavva@caviumnetworks.com>
 
+	Bug #708
+	* mips-tdep.c (mips_gdbarch_init): Add bfd_mach_mips_octeon
+	and bfd_mach_mips_octeonp and bfd_mach_mips_octeon2 to set
+	the default ABI to N64.
+
+2012-07-12  Chandrakala Chavva  <cchavva@caviumnetworks.com>
+
 	* mips-tdep.c (mips_eabi_return_value): Added checks to
 	return the correct value for the return value stored in 
 	register/register pair.
