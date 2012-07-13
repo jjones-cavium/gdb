@@ -1,3 +1,9 @@
+2012-07-12  Chandrakala Chavva  <cchavva@caviumnetworks.com>
+
+	* mips-tdep.c (mips_eabi_return_value): Added checks to
+	return the correct value for the return value stored in 
+	register/register pair.
+
 2012-07-12  Andrew Pinski  <apinski@cavium.com>
 
 	* mips-tdep.c (mips_eabi_push_dummy_call):

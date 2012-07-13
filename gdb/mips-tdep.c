@@ -4613,18 +4613,34 @@ mips_eabi_return_value (struct gdbarch *gdbarch, struct value *function,
 	fprintf_unfiltered (gdb_stderr, "Return scalar in $v0\n");
       regnum = MIPS_V0_REGNUM;
     }
-  for (offset = 0;
-       offset < TYPE_LENGTH (type);
-       offset += mips_abi_regsize (gdbarch), regnum++)
+
+  /* The return value is stored in single register.  */
+  if (TYPE_LENGTH (type) <= mips_abi_regsize (gdbarch))
     {
-      xfer = mips_abi_regsize (gdbarch);
-      if (offset + xfer > TYPE_LENGTH (type))
-	xfer = TYPE_LENGTH (type) - offset;
+      xfer = TYPE_LENGTH (type);
+      mips_xfer_register (gdbarch, regcache,
+			  gdbarch_num_regs (gdbarch) + regnum, xfer,
+			  gdbarch_byte_order (gdbarch), readbuf, writebuf, 0);
+    }
+  else
+    {
+      /* Value is stored in v0|v1 right-justified according to endiannes
+	 rules.  */
+      int size = mips_abi_regsize (gdbarch);
+      int len = TYPE_LENGTH (type);
+      offset = 0;
+      xfer = len - size;
       mips_xfer_register (gdbarch, regcache,
 			  gdbarch_num_regs (gdbarch) + regnum, xfer,
 			  gdbarch_byte_order (gdbarch), readbuf, writebuf,
 			  offset);
-    }
+      offset = len - size;
+      xfer = len - xfer;
+      mips_xfer_register (gdbarch, regcache,
+			  gdbarch_num_regs (gdbarch) + regnum + 1, xfer,
+			  gdbarch_byte_order (gdbarch), readbuf, writebuf,
+			  offset);
+     }
 
   return RETURN_VALUE_REGISTER_CONVENTION;
 }
