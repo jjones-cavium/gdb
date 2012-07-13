@@ -3983,6 +3983,25 @@ mips_software_single_step (struct frame_info *frame)
   return 1;
 }
 
+/* mips_software_single_step() is called just before we want to resume
+   the inferior, if we want to single-step it but there is no hardware
+   or kernel single-step support (MIPS on GNU/Linux for example).  We find
+   the target of the coming instruction and breakpoint it.  */
+
+static int
+mips_default_software_single_step (struct frame_info *frame)
+{
+  struct gdbarch *gdbarch = get_frame_arch (frame);
+  struct address_space *aspace = get_frame_address_space (frame);
+  CORE_ADDR pc, next_pc;
+
+  pc = get_frame_pc (frame);
+  if (deal_with_atomic_sequence (gdbarch, aspace, pc))
+    return 1;
+
+  return 0;
+}
+
 /* Test whether the PC points to the return instruction at the
    end of a function.  */
 
@@ -8592,6 +8611,9 @@ mips_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   set_gdbarch_register_type (gdbarch, mips_register_type);
 
   set_gdbarch_print_registers_info (gdbarch, mips_print_registers_info);
+
+  /* Default the single stepping to software if there is an atomic sequence. */
+  set_gdbarch_software_single_step (gdbarch, mips_default_software_single_step);
 
   if (mips_abi == MIPS_ABI_N32)
     set_gdbarch_print_insn (gdbarch, gdb_print_insn_mips_n32);
