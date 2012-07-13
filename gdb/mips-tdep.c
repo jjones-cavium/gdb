@@ -4373,7 +4373,8 @@ mips_eabi_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
       /* The EABI passes structures that do not fit in a register by
          reference.  */
       else if (len > regsize
-	  && (typecode == TYPE_CODE_STRUCT || typecode == TYPE_CODE_UNION))
+	  && (typecode == TYPE_CODE_STRUCT || typecode == TYPE_CODE_UNION
+	      || typecode == TYPE_CODE_COMPLEX))
 	{
 	  store_unsigned_integer (valbuf, regsize, byte_order,
 				  value_address (arg));
