@@ -1,3 +1,9 @@
+2012-07-12  Andrew Pinski  <apinski@cavium.com>
+
+	* mips-tdep.c (mips_eabi_push_dummy_call):
+	Complex arguments which are wider than the register size
+	are passed via reference.
+
 2012-07-12  Chandrakala Chavva  <cchavva@caviumnetworks.com>
 
 	* mips-tdep.c (mips_gdbarch_init): Set fpu_type to MIPS_FPU_NONE for
