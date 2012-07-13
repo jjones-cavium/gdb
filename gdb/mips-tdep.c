@@ -200,6 +200,17 @@ is_mips16_addr (CORE_ADDR addr)
   return ((addr) & 1);
 }
 
+static int
+is_octeon (struct gdbarch *gdbarch, const struct bfd_arch_info *info)
+{
+  if (!info)
+    info = gdbarch_bfd_arch_info (gdbarch);
+
+  return (info->mach == bfd_mach_mips_octeon
+	  || info->mach == bfd_mach_mips_octeonp
+	  || info->mach == bfd_mach_mips_octeon2);
+}
+
 static CORE_ADDR
 unmake_mips16_addr (CORE_ADDR addr)
 {
@@ -1148,6 +1159,47 @@ mips32_next_pc (struct frame_info *frame, CORE_ADDR pc)
 	    pc += mips32_relative_offset (inst) + 4;
 	  else
 	    pc += 8;
+	}
+      else if (is_octeon (gdbarch, NULL))
+	{
+	  int bit, branch_if;
+
+	  switch (itype_op (inst))
+	    {
+	      /* BBIT0 is encoded as LWC2: 110 010.  */
+	    case 50:
+	      bit = itype_rt (inst);
+	      branch_if = 0;
+	      goto bit_branch;
+
+	      /* BBIT032 is encoded as LDC2: 110 110.  */
+	    case 54:
+	      bit = itype_rt (inst) + 32;
+	      branch_if = 0;
+	      goto bit_branch;
+
+	      /* BBIT1 is encoded as SWC2: 111 010.  */
+	    case 58:
+	      bit = itype_rt (inst);
+	      branch_if = 1;
+	      goto bit_branch;
+
+	      /* BBIT132 is encoded as SDC2: 111 110.  */
+	    case 62:
+	      bit = itype_rt (inst) + 32;
+	      branch_if = 1;
+	    bit_branch:
+	      if (((get_frame_register_signed (frame,
+					       itype_rs (inst)) >> bit) & 1)
+		  == branch_if)
+		pc += mips32_relative_offset (inst) + 4;
+	      else
+		pc += 8;	/* after the delay slot */
+	      break;
+
+	    default:
+	      pc += 4;		/* Not a branch, next instruction is easy */
+	    }
 	}
       else
 	pc += 4;		/* Not a branch, next instruction is easy.  */

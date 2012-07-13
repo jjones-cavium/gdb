@@ -1,3 +1,11 @@
+2012-07-12  Adam Nemet  <anemet@caviumnetworks.com>
+
+	Bug #1389
+	* mips-tdep.c (is_octeon): New function.
+	(mips32_next_pc): Handle BBIT.
+	* testsuite/gdb.arch/mips-octeon-bbit.c: New file.
+	* testsuite/gdb.arch/mips-octeon-bbit.exp: New Test.
+
 2012-07-12  Chandrakala Chavva  <cchavva@caviumnetworks.com>
 
 	Bug #1097
