@@ -1,5 +1,10 @@
 2012-07-12  Chandrakala Chavva  <cchavva@caviumnetworks.com>
 
+	* mips-tdep.c (mips_gdbarch_init): Set fpu_type to MIPS_FPU_NONE for
+	Octeon.
+
+2012-07-12  Chandrakala Chavva  <cchavva@caviumnetworks.com>
+
 	Bug #1097
 	* gdbserver/server.c (main): Print gdbserver version number
 	whenever gdbserver is invoked. 
