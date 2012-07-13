@@ -3139,6 +3139,9 @@ main (int argc, char *argv[])
       exit (1);
     }
 
+  /* Print the version number while debugging using gdbserver.  */ 
+  printf ("GNU gdbserver %s\n", version);
+
   initialize_async_io ();
   initialize_low ();
   initialize_event_loop ();
