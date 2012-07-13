@@ -8193,6 +8193,12 @@ mips_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 	  else
 	    found_abi = MIPS_ABI_N32;
 	  break;
+	/* Default to N64 ABI instead of O32 for Octeon.  */
+	case bfd_mach_mips_octeon:
+	case bfd_mach_mips_octeonp:
+	case bfd_mach_mips_octeon2:
+	  found_abi = MIPS_ABI_N64;
+	  break;
 	}
     }
 
