@@ -1,5 +1,11 @@
 2012-07-16  Andrew Pinski  <apinski@cavium.com>
 
+	Bug #1536
+	* elfxx-mips.c (mips_elf_lay_out_got): Increase the initial
+	guess for page_gotno by 2.
+
+2012-07-16  Andrew Pinski  <apinski@cavium.com>
+
 	* elfxx-mips.c (_bfd_mips_elf_merge_private_bfd_data): Report what the
 	targets are when they mismatch.
 

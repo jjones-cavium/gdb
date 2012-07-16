@@ -8828,8 +8828,8 @@ mips_elf_lay_out_got (bfd *output_bfd, struct bfd_link_info *info)
     page_gotno = 0;
   else
     /* Assume there are two loadable segments consisting of contiguous
-       sections.  Is 5 enough?  */
-    page_gotno = (loadable_size >> 16) + 5;
+       sections.  Is 7 enough?  */
+    page_gotno = (loadable_size >> 16) + 7;
 
   /* Choose the smaller of the two page estimates; both are intended to be
      conservative.  */
