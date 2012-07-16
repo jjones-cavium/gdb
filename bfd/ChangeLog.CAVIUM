@@ -1,5 +1,10 @@
 2012-07-16  Andrew Pinski  <apinski@cavium.com>
 
+	* elfxx-mips.c (_bfd_mips_elf_merge_private_bfd_data): Report what the
+	targets are when they mismatch.
+
+2012-07-16  Andrew Pinski  <apinski@cavium.com>
+
 	Bug #4208
 	* elf32-mips.c (ELF_COMMONPAGESIZE): Define to 64k.
 	(ELF_MINPAGESIZE): Define to 4k.

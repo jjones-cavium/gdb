@@ -13880,8 +13880,8 @@ _bfd_mips_elf_merge_private_bfd_data (bfd *ibfd, bfd *obfd)
   if (strcmp (bfd_get_target (ibfd), bfd_get_target (obfd)) != 0)
     {
       (*_bfd_error_handler)
-	(_("%B: ABI is incompatible with that of the selected emulation"),
-	 ibfd);
+	(_("%B: ABI is incompatible with that of the selected emulation: \"%s\" != \"%s\""),
+	 ibfd, bfd_get_target (ibfd), bfd_get_target (obfd));
       return FALSE;
     }
 
