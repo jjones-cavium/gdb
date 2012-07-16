@@ -2406,7 +2406,8 @@ static const struct ecoff_debug_swap mips_elf32_ecoff_debug_swap = {
    is the maximum page size, the files are suitable for paging
    regardless of physical page size.  */
 #define ELF_MAXPAGESIZE			0x10000
-#define ELF_COMMONPAGESIZE		0x1000
+#define ELF_COMMONPAGESIZE		0x10000
+#define ELF_MINPAGESIZE			0x1000
 #define elf32_bed			elf32_tradbed
 
 /* Include the target file again for this target.  */
@@ -2458,6 +2459,7 @@ mips_vxworks_final_write_processing (bfd *abfd, bfd_boolean linker)
 #undef TARGET_BIG_NAME
 
 #undef ELF_MAXPAGESIZE
+#undef ELF_MINPAGESIZE
 #undef ELF_COMMONPAGESIZE
 
 #define TARGET_LITTLE_SYM               bfd_elf32_littlemips_vxworks_vec

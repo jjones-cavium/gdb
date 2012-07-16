@@ -1,0 +1,10 @@
+2012-07-16  Andrew Pinski  <apinski@cavium.com>
+
+	Bug #4208
+	* elf32-mips.c (ELF_COMMONPAGESIZE): Define to 64k.
+	(ELF_MINPAGESIZE): Define to 4k.
+	* elf64-mips.c (ELF_COMMONPAGESIZE): Define to 64k.
+	(ELF_MINPAGESIZE): Define to 4k.
+	* elfn32-mips.c (ELF_COMMONPAGESIZE): Define to 64k.
+	(ELF_MINPAGESIZE): Define to 4k.
+

@@ -4262,7 +4262,8 @@ extern bfd_boolean bfd_elf64_archive_write_armap
 #define TARGET_BIG_NAME			"elf64-bigmips"
 
 #define ELF_MAXPAGESIZE			0x10000
-#define ELF_COMMONPAGESIZE		0x1000
+#define ELF_MINPAGESIZE			0x1000
+#define ELF_COMMONPAGESIZE		0x10000
 
 #include "elf64-target.h"
 
@@ -4273,6 +4274,7 @@ extern bfd_boolean bfd_elf64_archive_write_armap
 #undef TARGET_BIG_NAME
 
 #undef ELF_MAXPAGESIZE
+#undef ELF_MINPAGESIZE
 #undef ELF_COMMONPAGESIZE
 
 #define TARGET_LITTLE_SYM		bfd_elf64_tradlittlemips_vec
@@ -4281,7 +4283,8 @@ extern bfd_boolean bfd_elf64_archive_write_armap
 #define TARGET_BIG_NAME			"elf64-tradbigmips"
 
 #define ELF_MAXPAGESIZE			0x10000
-#define ELF_COMMONPAGESIZE		0x1000
+#define ELF_MINPAGESIZE			0x1000
+#define ELF_COMMONPAGESIZE		0x10000
 #define elf64_bed			elf64_tradbed
 
 /* Include the target file again for this target.  */

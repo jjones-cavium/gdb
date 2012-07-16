@@ -3454,7 +3454,8 @@ static const struct ecoff_debug_swap mips_elf32_ecoff_debug_swap = {
 #define TARGET_BIG_NAME                 "elf32-nbigmips"
 
 #define ELF_MAXPAGESIZE			0x10000
-#define ELF_COMMONPAGESIZE		0x1000
+#define ELF_MINPAGESIZE			0x1000
+#define ELF_COMMONPAGESIZE		0x10000
 
 #include "elf32-target.h"
 
@@ -3465,6 +3466,7 @@ static const struct ecoff_debug_swap mips_elf32_ecoff_debug_swap = {
 #undef TARGET_BIG_NAME
 
 #undef ELF_MAXPAGESIZE
+#undef ELF_MINPAGESIZE
 #undef ELF_COMMONPAGESIZE
 
 #define TARGET_LITTLE_SYM               bfd_elf32_ntradlittlemips_vec
@@ -3473,7 +3475,8 @@ static const struct ecoff_debug_swap mips_elf32_ecoff_debug_swap = {
 #define TARGET_BIG_NAME                 "elf32-ntradbigmips"
 
 #define ELF_MAXPAGESIZE			0x10000
-#define ELF_COMMONPAGESIZE		0x1000
+#define ELF_MINPAGESIZE			0x1000
+#define ELF_COMMONPAGESIZE		0x10000
 #define elf32_bed			elf32_tradbed
 
 /* Include the target file again for this target.  */
