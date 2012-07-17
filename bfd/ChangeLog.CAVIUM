@@ -1,3 +1,7 @@
+2012-07-16  Chandrakala Chavva  <cchavva@caviumnetworks.com>
+
+	* config.bfd: Added vector information for mipsisa64*-octeon-elf* target.
+
 2012-07-16  Andrew Pinski  <apinski@cavium.com>
 
 	Bug #1536
