@@ -8318,6 +8318,15 @@ _bfd_mips_relax_section (bfd *abfd, asection *sec,
   if (link_info->relocatable)
     return TRUE;
 
+  /* Don't read relocations from the .rel.dyn section.  We can't do
+     relaxation with them and _bfd_elf_link_read_relocs can fail with
+     .rel.dyn if it is attached to a stripped shared library.  For
+     stripped shared libraries symtab_hdr->sh_entsize is zero which is
+     used as a divisor in _bfd_elf_link_read_relocs.  */
+  if (strcmp (bfd_get_section_name (abfd, sec),
+	      MIPS_ELF_REL_DYN_NAME (link_info)) == 0)
+    return TRUE;
+
   internal_relocs = _bfd_elf_link_read_relocs (abfd, sec, NULL, NULL,
 					       link_info->keep_memory);
   if (internal_relocs == NULL)

@@ -1,5 +1,10 @@
 2012-07-16  Adam Nemet  <anemet@caviumnetworks.com>
 
+	* elfxx-mips.c (_bfd_mips_relax_section): Ignore relocations in
+	.rel.dyn sections.
+
+2012-07-16  Adam Nemet  <anemet@caviumnetworks.com>
+
 	* elfxx-mips.c (PREFER_JUMP_OVER_BRANCH): New macro.
 	(_bfd_mips_relax_section): Use it.  Skip relocations against the
 	lazy-binding stub.
