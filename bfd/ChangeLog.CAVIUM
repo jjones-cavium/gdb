@@ -1,5 +1,10 @@
 2012-07-16  Adam Nemet  <anemet@caviumnetworks.com>
 
+	* elfxx-mips.c (_bfd_mips_elf_final_link): Report error instead of
+	BFD_ASSERT if size of .reginfo is incorrect.
+
+2012-07-16  Adam Nemet  <anemet@caviumnetworks.com>
+
 	* elfxx-mips.c (_bfd_mips_relax_section): Ignore relocations in
 	.rel.dyn sections.
 
