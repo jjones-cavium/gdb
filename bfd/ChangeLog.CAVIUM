@@ -1,3 +1,9 @@
+2012-07-16  Andrew Pinski  <apinski@cavium.com>
+            Chandrakala Chavva  <cchavva@caviumnetworks.com>
+
+	* config.bfd (mips64el-octeon-linux*): New target.
+	 (mips64-octeon-linux*): New target.
+
 2012-07-16  Adam Nemet  <anemet@caviumnetworks.com>
 
 	* elfxx-mips.c (_bfd_mips_elf_final_link): Report error instead of
