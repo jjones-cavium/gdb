@@ -1,3 +1,11 @@
+2012-07-16  Adam Nemet  <anemet@caviumnetworks.com>
+
+	* elfxx-mips.c (PREFER_JUMP_OVER_BRANCH): New macro.
+	(_bfd_mips_relax_section): Use it.  Skip relocations against the
+	lazy-binding stub.
+	(_bfd_mips_elf_additional_program_headers): Add one if there is
+	section .eh_frame_hdr.
+
 2012-07-16  Chandrakala Chavva  <cchavva@caviumnetworks.com>
 
 	* config.bfd: Added vector information for mipsisa64*-octeon-elf* target.
