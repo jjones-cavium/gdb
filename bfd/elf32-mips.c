@@ -2394,6 +2394,7 @@ static const struct ecoff_debug_swap mips_elf32_ecoff_debug_swap = {
 
 #undef ELF_MAXPAGESIZE
 #undef ELF_COMMONPAGESIZE
+#undef ELF_MINPAGESIZE
 
 #define TARGET_LITTLE_SYM               bfd_elf32_tradlittlemips_vec
 #define TARGET_LITTLE_NAME              "elf32-tradlittlemips"
