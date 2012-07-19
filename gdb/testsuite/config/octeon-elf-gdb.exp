@@ -1,0 +1,39 @@
+# Common code between the serial, PCI and simulator Octeon configurations.
+
+# Have gdb_start reset test-local globals.  This way we never forget
+# unsetting them at the end of the test.
+
+proc gdb_start {} {
+    reset_octeon_vars
+    default_gdb_start
+}
+
+set octeon_vars {
+    OCTEON_NUMCORES OCTEON_SIM_PERF OCTEON_SIM_ARGS OCTEON_BOOTCMD
+    OCTEON_SPAWN_SIM OCTEON_ATTACH
+}
+
+# ??? PCI's octeon_load_addr should be added here.
+proc reset_octeon_vars {} {
+    global octeon_vars
+
+    foreach {v} $octeon_vars {
+	global $v
+	if [info exists $v] {
+	    eval set old $$v
+	    send_log "Resetting Octeon variable $v (old value: $old)\n"
+	    unset $v
+	}
+    }
+}
+					
+# The SIGINT handler is only setup while we wait for a response from
+# the stub.  Outside of this region ctrl-c can go ignored.  The octeon
+# targets print "Interrupting" if the ctrl-c was intercepted.
+proc send_ctrl_c {} {
+    for {set i 0} {$i < 5} {incr i} {
+	send_log "Sending ctrl-c\n"
+	send_gdb "\003"
+	gdb_expect 1 { "Interrupting" return }
+    }
+}

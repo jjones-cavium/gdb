@@ -1,0 +1,72 @@
+load_lib octeon.exp
+
+# Test second run.  Similiar to second_run1.exp, setting hardware breakpoint
+# on other core than the one that stopped after target command.
+
+if {![string match "octeon-elf-pci*" [target_info name]]
+    && ![string match "octeon-elf-sim*" [target_info name]]} {
+    return -1
+}
+
+set testfile "second-run"
+set srcfile ${testfile}.c
+set binfile ${objdir}/${subdir}/${testfile}
+
+if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable \
+       {debug nowarnings}] != "" } {
+     fail "compilation"
+     return
+}
+pass "compilation"
+
+gdb_exit
+gdb_start
+
+set OCTEON_NUMCORES 2
+# Have gdb spawn the simulator to enable rerun.
+set OCTEON_SPAWN_SIM 1
+
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+#disable the checks in gdb_test_multiple so we can allow run to work.
+set use_gdb_stub 0
+
+gdb_test "set step-all on"
+gdb_test "set active-cores"
+
+set newfocus [expr 1 - [get_focus]]
+
+gdb_test "break main"
+gdb_test "run" "Breakpoint 1, main.*" "run to main"
+gdb_test "disable 1"
+
+gdb_test "set focus $newfocus"
+gdb_test "hbreak g" \
+     "Hardware assisted breakpoint 2 at.* file .*$srcfile, line.*" \
+     "set hardware instruction breakpoint"
+
+eval set prompt \$octeon_core${newfocus}_prompt
+
+for {set i 0} {$i < 15} {incr i} {
+    if {$i == 0} {
+	set test "run to hardware instruction breakpoint"
+    } else {
+	set test "rerun to hardware instruction breakpoint $i"
+    }
+    gdb_test_multiple "run" "$test" {
+	-re "The program .* has been started already.*y or n. $" {
+	    send_gdb "y\n"
+	    exp_continue
+	}
+	-re ".*Breakpoint 2, g .* at .*$srcfile.*$prompt $" {
+	    pass "$test"
+	}
+	-re ".*$prompt $" {
+	    fail "$test"
+	}
+	timeout {
+	    fail "$test (timeout)"
+	}
+    }
+}

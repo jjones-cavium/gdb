@@ -105,6 +105,11 @@ proc default_mi_gdb_start { args } {
     global gdb_spawn_id;
     global MIFLAGS
 
+    if { ![isnative] && [istarget "mips*-octeon-*"] } {
+         pass "Test not supported on this target"
+         return 1
+    }
+
     gdb_stop_suppressing_tests;
     set inferior_pty no-tty
 

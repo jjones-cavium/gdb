@@ -1,0 +1,153 @@
+#   Copyright 2007 Cavium Networks, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+#
+# Test "set focus nondebuggedcore#" should not change focus and should be
+# able to continue debugging.
+#
+if ![istarget "mipsisa64-octeon-*"] then {
+  return -1;
+}
+
+set testfile "multicore-stepmode-1"
+set srcfile ${testfile}.c
+set binfile ${objdir}/${subdir}/${testfile}.out
+
+if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable \
+	   {debug nowarnings}] != "" } {
+      fail "compilation"
+      return
+}
+
+if [get_compiler_info ${binfile}] {
+    return -1
+}
+
+pass "compilation"
+
+gdb_exit
+gdb_start
+set OCTEON_NUMCORES 4
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+gdb_test "set step-all on"
+gdb_test "set active-cores"
+
+gdb_test "break main" \
+     "Breakpoint 1 at.* file .*$srcfile, line.*" \
+     "breakpoint"
+
+gdb_run_cmd
+gdb_expect {
+     -re ".*Breakpoint \[0-9\]+, .*main.* at .*$srcfile.*$gdb_prompt $" {
+	pass "run to breakpoint"
+     }
+     -re ".*$gdb_prompt $" {
+	fail "run to breakpoint"
+     }
+     timeout { fail "run to breakpoint (timeout)" }
+}
+
+# Focus of the core should not change when "set focus 8", (here 8 is a core
+# in reset, not being debugged). 
+send_gdb "set focus 1\n"
+gdb_expect {
+   -re ".*$octeon_core1_prompt $" {
+	pass "set focus 1"
+   }
+   -re ".*$gdb_prompt $" {
+	fail "set focus 1"
+   }
+   timeout { fail "set focus 1 (timeout)" }
+}	
+
+gdb_test "set step-all off"
+
+send_gdb "set focus 8\n"
+gdb_expect {
+    -re ".*Core is in reset. It can't become the focus core.*$octeon_core1_prompt $" {
+	pass "focus did not change"
+     }
+
+    -re ".*Core is not in the exception handler. Focus not changed.*$octeon_core1_prompt $" {
+	pass "focus did not change"
+    }
+
+    -re ".*$gdb_prompt $" { 
+	fail "focus did not change"
+    }
+
+    timeout { fail "focus did not change (timeout)" }
+} 
+
+# The "show focus" should match the debugger prompt
+
+send_gdb "show focus\n"
+gdb_expect {
+    -re ".*The currently debugged core is 1.*$octeon_core1_prompt $" {
+	pass "show focus"
+    }
+    -re ".*$gdb_prompt $" {
+	fail "show focus"
+    }
+    timeout { fail "show focus (timeout)" }
+}
+
+send_gdb "next\n"
+gdb_expect {
+   -re ".*$octeon_core1_prompt $" {
+       pass "next stopped in core 1"
+   }
+   -re ".*$gdb_prompt $" {
+	fail "next stopped in core 1"
+   }
+   timeout { fail "next stopped in core 1 (timeout)" }
+}	
+
+# similarly try changing to core #2
+send_gdb "set focus 2\n"
+gdb_expect {
+   -re ".*$octeon_core2_prompt $" {
+	pass "set focus 2"
+   }
+   -re ".*$gdb_prompt $" {
+	fail "set focus 2"
+   }
+   timeout { fail "set focus 2 (timeout)" }
+}	
+
+gdb_test "set focus 5"
+
+send_gdb "next\n"
+gdb_expect {
+   -re ".*$octeon_core2_prompt $" {
+       pass "next stopped in core 2"
+   }
+   -re ".*$gdb_prompt $" {
+	fail "next stopped in core 2"
+   }
+   timeout { fail "next stopped in core 2 (timeout)" }
+}	
+
+# Also make sure the debugger is alive when changing back to step-all on
+gdb_test "set step-all on"
+send_gdb "next\n"
+gdb_expect {
+    -re ".*$gdb_prompt $" {
+	pass "next after step-all on"
+    }
+
+    timeout { fail "next after step-all on (timeout)" }
+}

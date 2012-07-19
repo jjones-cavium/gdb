@@ -1170,6 +1170,13 @@ extern ULONGEST align_down (ULONGEST v, int n);
 void *hashtab_obstack_allocate (void *data, size_t size, size_t count);
 void dummy_obstack_deallocate (void *object, void *data);
 
+/* From remote-run.c */
+extern void setup_generic_remote_run (char *, ptid_t);
+extern int generic_remote_can_run_target (char *);
+extern void generic_remote_create_inferior (struct target_ops *, char *, char *, char **, int);
+
+extern int never_print_frame;
+
 /* From progspace.c */
 
 extern void initialize_progspace (void);

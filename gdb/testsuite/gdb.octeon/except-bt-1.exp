@@ -1,0 +1,66 @@
+#   Copyright 2007 Cavium Networks, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+#
+# Test backtrace from exception handler. 
+#
+if ![istarget "mipsisa64-octeon-*"] then {
+  return -1;
+}
+
+set testfile "except-bt-1"
+set srcfile ${testfile}.c
+set binfile ${testfile}.out
+
+# build simple exec app
+set binfile [ cvmx_compile $binfile $srcdir/$subdir $srcfile "" "-g" "" "" ]
+
+if { $binfile == "" } {
+  fail "compilation"
+  return;
+}
+
+pass "compilation"
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+gdb_test "break foo" \
+    "Breakpoint.*at.* file .*$srcfile, line.*" \
+    "breakpoint function"
+
+gdb_run_cmd
+gdb_expect {
+     -re ".*Breakpoint \[0-9\]+, .*foo.*$gdb_prompt $" {
+        pass "run to breakpoint"
+     }
+    -re ".*$gdb_prompt" {
+        fail "run to breakpoint"
+    }
+    timeout { fail "run to breakpoint (timeout)" }
+}
+
+gdb_test "next" \
+    ".*cvmx_interrupt_do_irq.*" \
+    "stopped at default exception handler"
+
+gdb_test "backtrace" \
+    "#0.*cvmx_interrupt_do_irq.*
+#1.*cvmx_interrupt_stage2.*
+#2.*in foo.*
+#3.*in main.*" \
+    "backtrace from default exception handler"
+

@@ -46,6 +46,9 @@
 /* Define to BFD's default target vector. */
 #undef DEFAULT_BFD_VEC
 
+/* Define to be the default GDB prompt. */
+#undef DEFAULT_PROMPT
+
 /* Define to 1 if translation of program messages to the user's native
    language is requested. */
 #undef ENABLE_NLS
@@ -157,6 +160,9 @@
 /* Define to 1 if you have the <dirent.h> header file, and it defines `DIR'.
    */
 #undef HAVE_DIRENT_H
+
+/* Define to 1 if you have the <dlfcn.h> header file. */
+#undef HAVE_DLFCN_H
 
 /* Define if ELF support should be included. */
 #undef HAVE_ELF
@@ -725,6 +731,13 @@
 /* Define as const if the declaration of iconv() needs const. */
 #undef ICONV_CONST
 
+/* directory to load the JIT readers from */
+#undef JIT_READER_DIR
+
+/* Define if the jit-reader-dir directory should be relocated when GDB is
+   moved. */
+#undef JIT_READER_DIR_RELOCATABLE
+
 /* Define to a substitute value for mmap()'s MAP_ANONYMOUS flag. */
 #undef MAP_ANONYMOUS
 
@@ -809,6 +822,15 @@
 
 /* The size of `long', as computed by sizeof. */
 #undef SIZEOF_LONG
+
+/* The size of `unsigned long', as computed by sizeof. */
+#undef SIZEOF_UNSIGNED_LONG
+
+/* The size of `unsigned long long', as computed by sizeof. */
+#undef SIZEOF_UNSIGNED_LONG_LONG
+
+/* The size of `unsigned __int128', as computed by sizeof. */
+#undef SIZEOF_UNSIGNED___INT128
 
 /* Define to l, ll, u, ul, ull, etc., as suitable for constants of type
    'size_t'. */

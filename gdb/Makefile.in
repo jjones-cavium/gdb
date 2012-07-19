@@ -1537,6 +1537,7 @@ ALLDEPFILES = \
 	ppcobsd-nat.c ppcobsd-tdep.c \
 	procfs.c \
 	remote-m32r-sdi.c remote-mips.c \
+	remote-octeon.c remote-run.c \
 	remote-sim.c \
 	dcache.c \
 	rs6000-nat.c rs6000-tdep.c \

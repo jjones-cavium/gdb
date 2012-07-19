@@ -1,0 +1,103 @@
+#   Copyright 2007 Cavium Networks, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+#
+# Test backtrace from user handler on exception for optimized code. 
+#
+if ![istarget "mipsisa64-octeon-*"] then {
+  return -1;
+}
+
+set testfile "except-bt-2"
+set srcfile ${testfile}.c
+set binfile ${testfile}.out
+
+# build simple exec app
+set binfile [ cvmx_compile $binfile $srcdir/$subdir $srcfile "" "-g -O2" "" \
+	      "" ]
+
+if { $binfile == "" } {
+  fail "compilation"
+  return;
+}
+
+pass "compilation"
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+gdb_test "break octeon_debug_handler"
+
+gdb_run_cmd
+gdb_expect {
+     -re ".*Breakpoint \[0-9\]+, .*octeon_debug_handler.*$gdb_prompt $" {
+        pass "run to breakpoint"
+     }
+    -re ".*$gdb_prompt" {
+        fail "run to breakpoint"
+    }
+    timeout { fail "run to breakpoint (timeout)" }
+}
+
+gdb_test "backtrace" \
+    "#0.*octeon_debug_handler.*
+#1.*cvmx_interrupt_do_irq.*
+#2.*cvmx_interrupt_stage2.*
+#3.*main.*" \
+    "backtrace from user handler"
+
+# Go to main and check the cause of the exception
+gdb_test "up 3" \
+	"#3 .*in main.*" \
+	"in main"
+
+send_gdb "p/x &fault_addr\n"
+gdb_expect {
+    -re ".* = \(0x\[0-9a-f\]+\).*$gdb_prompt $" {
+	set fault_addr $expect_out(1,string)
+	send_log "fault_addr: $fault_addr\n"
+	pass "print fault_addr"
+    }
+    timeout {
+	fail "print fault_addr (timeout)"
+    }
+}
+
+set register "v0"
+send_gdb "x/i \$pc\n"
+gdb_expect {
+    -re ".*$fault_addr.*lw.*v0,0\\(\(.*\)\\).*$gdb_prompt $" {
+	set register $expect_out(1,string)
+	pass "examining the contents of pc"
+    }
+    -re ".*$gdb_prompt $" {
+	fail "examining the contents of pc"
+    }
+    timeout { fail "examining the contents of pc (timeout)" }
+}
+
+gdb_test "info reg $register" \
+	"$register: 0x0" \
+	"print contents of $register register"	
+
+# check local and global variable
+gdb_test "print x" ".*= 100" "print local variable from main"
+gdb_test "print i" ".*= \\(int \\*\\) 0x0" "print global variable from main"
+
+# Go back to the handler
+gdb_test "down 3" \
+	"#0 .*octeon_debug_handler.*" \
+	"back to octeon_debug_handler"

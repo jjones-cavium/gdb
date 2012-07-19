@@ -1,0 +1,67 @@
+#   Copyright 2007 Cavium Networks, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+#
+# Test whether the program timeout. A "next" on multiply causes timeout.
+#
+if ![istarget "mipsisa64-octeon-*"] then {
+  return -1;
+}
+
+set testfile "3"
+set srcfile ${testfile}.cc
+set binfile ${objdir}/${subdir}/${testfile}.out
+
+if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug c++}] != "" } {
+      fail "compilation"
+      return
+}
+
+if [get_compiler_info ${binfile} "c++"] {
+    return -1
+}
+
+pass "compilation"
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+gdb_test "break ${srcfile}:86" \
+     "Breakpoint 1 at.* file .*$srcfile, line.*" \
+     "breakpoint"
+
+gdb_test "set step-all on"
+
+gdb_run_cmd
+gdb_expect {
+     -re ".*Breakpoint \[0-9\]+, .*test01.* at .*$srcfile.*" {
+	pass "run to breakpoint"
+     }
+     -re ".*$gdb_prompt $" {
+	fail "run to breakpoint"
+     }
+     timeout { fail "run to breakpoint (timeout)" }
+}
+
+send_gdb "next\n"
+gdb_expect 500 {
+   -re ".*PASSED.*$gdb_prompt $" {
+        pass "next"
+   }
+   timeout {
+	fail "next (timeout)"
+   }
+}
