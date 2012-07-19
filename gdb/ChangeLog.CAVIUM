@@ -1,3 +1,8 @@
+2012-07-18  Andrew Pinski  <apinski@cavium.com>
+
+        * ser-tcp.c (net_open): Work around static NSS not working
+        for looking up localhost by using 127.0.0.1 as localhost.
+
 2012-07-12  Andrew Pinski  <apinski@cavium.com>
 
 	Bug #4098

@@ -191,7 +191,11 @@ net_open (struct serial *scb, const char *name)
   if (!hostname[0])
     strcpy (hostname, "localhost");
 
-  hostent = gethostbyname (hostname);
+  if (strcmp (hostname, "localhost") == 0)
+    hostent = gethostbyname ("127.0.0.1");
+  else
+    hostent = gethostbyname (hostname);
+
   if (!hostent)
     {
       fprintf_unfiltered (gdb_stderr, "%s: unknown host\n", hostname);
