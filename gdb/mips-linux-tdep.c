@@ -1475,6 +1475,17 @@ mips_linux_init_abi (struct gdbarch_info info,
 	tramp_frame_prepend_unwinder (gdbarch, &mips_linux_n64_rt_sigframe);
 	set_xml_syscall_file_name ("syscalls/mips-n64-linux.xml");
 	break;
+      /* Added support for EABI ABI to debug simple exec applications over 
+	 PCI.  */
+      case MIPS_ABI_EABI64:
+	set_gdbarch_get_longjmp_target (gdbarch,
+	                                mips64_linux_get_longjmp_target);
+	set_solib_svr4_fetch_link_map_offsets
+	  (gdbarch, svr4_lp64_fetch_link_map_offsets);
+	set_gdbarch_long_double_bit (gdbarch, 64);
+	set_gdbarch_long_double_bit (gdbarch, 64);
+	tramp_frame_prepend_unwinder (gdbarch, &mips_linux_n64_rt_sigframe);
+	break;
       default:
 	break;
     }

@@ -1,3 +1,8 @@
+2012-07-18  Chandrakala Chavva  <cchavva@caviumnetworks.com>
+
+	* mips-linux-tdep.c (mips_linux_init_abi): Added support to
+	debug EABI ABI applications. 
+
 2012-07-18  Andrew Pinski  <apinski@cavium.com>
             Chandrakala Chavva  <cchavva@caviumnetworks.com>
             Adam Nemet  <anemet@caviumnetworks.com>
@@ -72,8 +77,8 @@
 	Add octeon dwarf2 sniffer.
 	Initialize register names, baud_rate and remote
 	timeout for Octeon.
-
-
+	* remote.c (remote_interrupt): Inform user if ctrl-c was
+	intercepted.
 	* target.h (to_insert_mc_hw_breakpoint): New.
 	(to_remove_mc_hw_breakpoint): Ditto.
 	(to_multicore_hw_breakpoint): Ditto.
@@ -94,9 +99,23 @@
 	(setup_target_debug): Ditto.
 	(debug_to_set_core_number): New function.
 	(setup_target_debug): Set to_set_core_number.
-	
-
-
+	* testsuite/Makefile.in (ALL_SUBDIRS): Add gdb.octeon.
+	* testsuite/configure.ac: Only configure in gdb.octeon if it exists.
+	* testsuite/configure: Regenerate.
+	* testsuite/gdb.asm/asm-source.exp: Disable for mips*-octeon-elf.
+	* testsuite/gdb.base/dbx.exp: Support running twice on octeon.
+	* testsuite/gdb.base/watch-cond.exp: Increase timeout to 240 secs
+	for this testcase.
+	* testsuite/gdb.cp/method.exp: Support remote-octeon exiting.
+	* testsuite/lib/mi-support.exp (mi_gdb_start): Disable gdb.mi
+	regressions for all Octeon cross targets.
+	* remote-octeon.c: New file.
+	* remote-run.c: New file.
+	* testsuite/config/octeon-elf-gdb.exp: New file.
+	* testsuite/config/octeon-elf-pci-config.exp: New file.
+	* testsuite/config/octeon-elf-serial-config.exp: New file
+	* testsuite/config/octeon-elf-sim-config.exp: New file.
+	* testsuite/gdb.octeon: New directory.
 
 2012-07-18  Andrew Pinski  <apinski@cavium.com>
 
