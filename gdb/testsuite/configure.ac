@@ -87,6 +87,11 @@ AC_CHECK_HEADERS(pthread.h)
 
 AC_EXEEXT
 
+# We do not include these in our source package.
+if test -f $srcdir/gdb.octeon/Makefile.in; then
+  gdb_octeon_makefile=gdb.octeon/Makefile
+fi
+
 AC_OUTPUT([Makefile \
   gdb.ada/Makefile \
   gdb.arch/Makefile gdb.asm/Makefile gdb.base/Makefile gdb.btrace/Makefile \
@@ -98,4 +103,5 @@ AC_OUTPUT([Makefile \
   gdb.mi/Makefile gdb.modula2/Makefile gdb.multi/Makefile \
   gdb.objc/Makefile gdb.opencl/Makefile gdb.opt/Makefile gdb.pascal/Makefile \
   gdb.python/Makefile gdb.reverse/Makefile gdb.stabs/Makefile \
+  $gdb_octeon_makefile \
   gdb.threads/Makefile gdb.trace/Makefile gdb.xml/Makefile])

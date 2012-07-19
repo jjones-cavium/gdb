@@ -1904,6 +1904,13 @@ decode_frame_entry_1 (struct comp_unit *unit, const gdb_byte *start,
          depends on the target address size.  */
       cie->encoding = DW_EH_PE_absptr;
 
+      /* The target address size.  For .eh_frame FDEs this is considered
+	 equal to the size of a target pointer.  For .dwarf_frame FDEs, 
+	 this is supposed to be the target address size from the associated
+	 CU header.  FIXME: We do not have a good way to determine the 
+	 latter.  Always use the target pointer size for now.  */
+      cie->addr_size = gdbarch_ptr_bit (gdbarch) / TARGET_CHAR_BIT;
+
       /* We'll determine the final value later, but we need to
 	 initialize it conservatively.  */
       cie->signal_frame = 0;

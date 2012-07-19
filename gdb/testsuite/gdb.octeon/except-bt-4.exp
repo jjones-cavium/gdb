@@ -1,0 +1,134 @@
+#   Copyright 2007 Cavium Networks, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+#
+# Test backtrace, global, static variables in case of exception in
+# non leaf function.
+#
+if ![istarget "mipsisa64-octeon-*"] then {
+  return -1;
+}
+
+# Test global, local and arguments at each frame on exception
+proc test_frame_variables { option } {
+    global gdb_prompt
+
+    gdb_test "backtrace" \
+        "#0.*cvmx_interrupt_do_irq.*
+#1.*cvmx_interrupt_stage2.*
+#2.*in convert_to_int \\(x=.*
+#3.*in factorial \\(val=.*
+#4.*in main.*" \
+        "backtrace from default exception handler ($option)"
+    
+    # print information about main
+    gdb_test "frame 4" "#4.*in main.*" "go to the bottom of stack ($option)"
+    gdb_test "print g" " = 54 '6'" "print small global from main ($option)"
+    gdb_test "print g_arr" " = \\{11, 22\\}" \
+	"print large global from main ($option)"
+    gdb_test "print y" " = 100" "print local in main ($option)"
+
+    # print all global, local variables in foo
+    gdb_test "down" "#3.*in factorial.*" "down to factorial ($option)"
+    gdb_test "print g" " = 54 '6'" "print global from factorial ($option)"
+    gdb_test "print g_arr\[0\]" " = 11" \
+	"print large global from factorial ($option)"
+    #gdb_test "print val" " = 54 '6'" "print arg0 passed to factorial ($option)"
+    # c does not need to be preserved with optimization.
+    if {$option ne "O2"} {
+	gdb_test "print c" " = 105 'i'" "print local from factorial ($option)"
+    }
+
+    # print all global, local variables in bar
+    gdb_test "down" "#2.*in convert_to_int.*" \
+	"down to convert_to_int ($option)"
+    gdb_test "print g_arr\[1\]" " = 22" \
+	"print global from convert_to_int ($option)"
+    gdb_test "print i" " = \\(int \\*\\) 0x0" \
+	"print i from convert_to_int ($option)"
+    #gdb_test "print x" " = 105 'i'" \
+	#"print arg0 passed to convert_to_int ($option)"
+
+    # go back to the top frame
+    gdb_test "down 2" \
+	"#0.*cvmx_interrupt_do_irq.*" \
+	 "in cvmx_interrupt_do_irq exception handler ($option)"
+    gdb_test "print g_arr\[1\]" " = 22" \
+	"print large global from top frame ($option)"
+}
+
+proc runto_cvmx_interrupt_do_irq { option } {
+    global gdb_prompt
+
+    gdb_test "break cvmx_interrupt_do_irq" \
+        "Breakpoint.*at.*" \
+        "breakpoint function ($option)"
+
+    gdb_run_cmd 
+    gdb_expect {
+         -re ".*Breakpoint \[0-9\]+, .*cvmx_interrupt_do_irq.*$gdb_prompt $" {
+            pass "run to breakpoint ($option)"
+         }
+        -re ".*$gdb_prompt" {
+            fail "run to breakpoint ($option)"
+        }
+        timeout { fail "run to breakpoint (timeout) ($option)" }
+    }
+}
+
+set testfile "except-bt-4"
+set srcfile ${testfile}.c
+set binfile ${testfile}-O2.out
+
+# First build simple exec app with optimization
+set binfile [ cvmx_compile $binfile $srcdir/$subdir $srcfile "" \
+		  "-g -O2 -fvar-tracking" "" "" ]
+
+if { $binfile == "" } {
+  fail "compilation -O2"
+  return;
+}
+
+pass "compilation -O2"
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+runto_cvmx_interrupt_do_irq "O2"
+
+# Test backtrace, parms, global and local variables for each frame.
+test_frame_variables "O2"
+
+# Recompile without optimization
+set binfile ${testfile}.out
+set binfile [ cvmx_compile $binfile $srcdir/$subdir $srcfile "" "-g" "" "" ]
+
+if { $binfile == "" } {
+  fail "compilation O0"
+  return;
+}
+
+pass "compilation O0"
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+runto_cvmx_interrupt_do_irq "O0"
+
+# Test backtrace, parms, global and local variables for each frame.
+test_frame_variables "00"

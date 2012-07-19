@@ -361,6 +361,7 @@ mips*-*-linux*)
 	# Target: Linux/MIPS
 	gdb_target_obs="mips-tdep.o mips-linux-tdep.o glibc-tdep.o \
 			solib-svr4.o symfile-mem.o linux-tdep.o"
+	gdb_target_obs="$gdb_target_obs remote-octeon.o remote-run.o"
 	gdb_sim=../sim/mips/libsim.a
 	build_gdbserver=yes
 	;;
@@ -372,6 +373,10 @@ mips*-*-netbsd* | mips*-*-knetbsd*-gnu)
 mips64*-*-openbsd*)
 	# Target: OpenBSD/mips64
 	gdb_target_obs="mips-tdep.o mips64obsd-tdep.o solib-svr4.o"
+	;;
+mipsisa64-octeon-elf*)
+	# Target: Octeon/ELF
+	gdb_target_obs="mips-tdep.o remote-octeon.o remote-run.o"
 	;;
 mips*-*-elf)
 	# Target: MIPS ELF

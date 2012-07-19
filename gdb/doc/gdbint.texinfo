@@ -588,6 +588,30 @@ a description of the @code{struct bp_target_info} pointed to by
 @var{bp_tgt}; the @code{shadow_contents} and
 @code{shadow_len} members are not used for hardware breakpoints,
 but @code{placed_size} may be.
+
+@cindex insert or remove hardware breakpoints in multicore debugging
+@findex target_remove_mc_hw_breakpoint
+@findex target_insert_mc_hw_breakpoint
+@item target_remove_mc_hw_breakpoint (@var{bp_tgt}, @var{core_number})
+@itemx target_insert_mc_hw_breakpoint (@var{bp_tgt}, @var{core_number})
+Insert or remove a hardware-assisted breakpoint at core_number whose 
+address is in @code{@var{bp_tgt}->placed_address}. Returns zero for 
+success, non-zero for failure. See @code{target_insert_breakpoint} for 
+a description of the @code{struct bp_target_info} pointed to by
+@var{bp_tgt}. When a hardware breakpoint is issued, it applies to the 
+focused core. 
+
+@cindex supports multicore debugging
+@findex target_multicore_hw_breakpoint
+@item target_multicore_hw_breakpoint ()
+Return one if the target supports multicore debugging. Otherwise returns 0.
+
+@cindex return the focused core number in multicore debugging
+@findex target_get_core_number
+@item target_get_core_number ()
+Return the core number of the focused core. Used to initialize the core_number
+of the struct bp_location. In some architectures the hardware breakpoints are 
+specfic to each core in multicore debugging.  
 @end table
 
 @section Single Stepping

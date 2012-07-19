@@ -114,11 +114,30 @@ static int debug_to_insert_hw_breakpoint (struct gdbarch *,
 static int debug_to_remove_hw_breakpoint (struct gdbarch *,
 					  struct bp_target_info *);
 
+static int debug_to_insert_mc_hw_breakpoint (struct gdbarch *,
+					     struct bp_target_info *, int);
+
+static int debug_to_remove_mc_hw_breakpoint (struct gdbarch *,
+					    struct bp_target_info *, int);
+
+static int debug_to_multicore_hw_breakpoint (void);
+
+static int debug_to_multicore_hw_watchpoint (void);
+
+static int debug_to_get_core_number (void);
+static void debug_to_set_core_number (int);
+
 static int debug_to_insert_watchpoint (CORE_ADDR, int, int,
 				       struct expression *);
 
 static int debug_to_remove_watchpoint (CORE_ADDR, int, int,
 				       struct expression *);
+
+static int debug_to_insert_mc_watchpoint (CORE_ADDR, int, int,
+				          struct expression *, int);
+
+static int debug_to_remove_mc_watchpoint (CORE_ADDR, int, int,
+				          struct expression *, int);
 
 static int debug_to_stopped_by_watchpoint (void);
 
@@ -618,9 +637,17 @@ update_current_target (void)
       INHERIT (to_can_use_hw_breakpoint, t);
       INHERIT (to_insert_hw_breakpoint, t);
       INHERIT (to_remove_hw_breakpoint, t);
+      INHERIT (to_insert_mc_hw_breakpoint, t);
+      INHERIT (to_remove_mc_hw_breakpoint, t);
+      INHERIT (to_multicore_hw_breakpoint, t);
+      INHERIT (to_multicore_hw_watchpoint, t);
+      INHERIT (to_get_core_number, t);
+      INHERIT (to_set_core_number, t);
       /* Do not inherit to_ranged_break_num_registers.  */
       INHERIT (to_insert_watchpoint, t);
       INHERIT (to_remove_watchpoint, t);
+      INHERIT (to_insert_mc_watchpoint, t);
+      INHERIT (to_remove_mc_watchpoint, t);
       /* Do not inherit to_insert_mask_watchpoint.  */
       /* Do not inherit to_remove_mask_watchpoint.  */
       INHERIT (to_stopped_data_address, t);
@@ -766,11 +793,35 @@ update_current_target (void)
   de_fault (to_remove_hw_breakpoint,
 	    (int (*) (struct gdbarch *, struct bp_target_info *))
 	    return_minus_one);
+  de_fault (to_insert_mc_hw_breakpoint,
+	    (int (*) (struct gdbarch *, struct bp_target_info *, int core_number))
+	    return_minus_one);
+  de_fault (to_remove_mc_hw_breakpoint,
+	    (int (*) (struct gdbarch *, struct bp_target_info *, int core_number))
+	    return_minus_one);
+  de_fault (to_multicore_hw_breakpoint,
+	   (int (*) (void))
+	   return_zero);
+  de_fault (to_multicore_hw_watchpoint,
+	   (int (*) (void))
+	   return_zero);
+  de_fault (to_get_core_number,
+	   (int (*) (void))
+	   return_minus_one);
+  de_fault (to_set_core_number,
+	   (void (*) (int))
+	   target_ignore);
   de_fault (to_insert_watchpoint,
 	    (int (*) (CORE_ADDR, int, int, struct expression *))
 	    return_minus_one);
   de_fault (to_remove_watchpoint,
 	    (int (*) (CORE_ADDR, int, int, struct expression *))
+	    return_minus_one);
+  de_fault (to_insert_mc_watchpoint,
+	    (int (*) (CORE_ADDR, int, int, struct expression *, int))
+	    return_minus_one);
+  de_fault (to_remove_mc_watchpoint,
+	    (int (*) (CORE_ADDR, int, int, struct expression *, int))
 	    return_minus_one);
   de_fault (to_stopped_by_watchpoint,
 	    (int (*) (void))
@@ -4596,6 +4647,55 @@ debug_to_can_use_hw_breakpoint (int type, int cnt, int from_tty)
 }
 
 static int
+debug_to_multicore_hw_breakpoint (void)
+{
+  int retval;
+
+  retval = debug_target.to_multicore_hw_breakpoint ();
+
+  fprintf_unfiltered (gdb_stdlog,
+		      "target_multicore_hw_breakpoint ()\n");
+
+  return retval;
+}
+
+static int
+debug_to_multicore_hw_watchpoint (void)
+{
+  int retval;
+
+  retval = debug_target.to_multicore_hw_watchpoint ();
+
+  fprintf_unfiltered (gdb_stdlog,
+		      "target_multicore_hw_watchpoint ()\n");
+
+  return retval;
+}
+
+static int
+debug_to_get_core_number (void)
+{
+  int retval;
+
+  retval = debug_target.to_get_core_number ();
+
+  fprintf_unfiltered (gdb_stdlog,
+		      "target_get_core_number ()\n");
+
+  return retval;
+}
+
+static void
+debug_to_set_core_number (int core)
+{
+  debug_target.to_set_core_number (core);
+
+  fprintf_unfiltered (gdb_stdlog,
+		      "target_set_core_number (%d)\n", core);
+}
+
+
+static int
 debug_to_region_ok_for_hw_watchpoint (CORE_ADDR addr, int len)
 {
   CORE_ADDR retval;
@@ -4701,6 +4801,38 @@ debug_to_remove_hw_breakpoint (struct gdbarch *gdbarch,
 }
 
 static int
+debug_to_insert_mc_hw_breakpoint (struct gdbarch *gdbarch,
+				  struct bp_target_info *bp_tgt, int core_number)
+{
+  int retval;
+
+  retval = debug_target.to_insert_mc_hw_breakpoint (gdbarch, bp_tgt, core_number);
+
+  fprintf_unfiltered (gdb_stdlog,
+		      "target_insert_mc_hw_breakpoint (0x%lx 0x%lx, xxx) = %ld\n",
+		      (unsigned long) bp_tgt->placed_address,
+		      (unsigned long) core_number,
+		      (unsigned long) retval);
+  return retval;
+}
+
+static int
+debug_to_remove_mc_hw_breakpoint (struct gdbarch *gdbarch,
+				  struct bp_target_info *bp_tgt, int core_number)
+{
+  int retval;
+
+  retval = debug_target.to_remove_mc_hw_breakpoint (gdbarch, bp_tgt, core_number);
+
+  fprintf_unfiltered (gdb_stdlog,
+		      "target_remove_mc_hw_breakpoint (0x%lx, 0x%lx, xxx) = %ld\n",
+		      (unsigned long) bp_tgt->placed_address,
+		      (unsigned long) core_number,
+		      (unsigned long) retval);
+  return retval;
+}
+
+static int
 debug_to_insert_watchpoint (CORE_ADDR addr, int len, int type,
 			    struct expression *cond)
 {
@@ -4727,6 +4859,38 @@ debug_to_remove_watchpoint (CORE_ADDR addr, int len, int type,
 		      "target_remove_watchpoint (%s, %d, %d, %s) = %ld\n",
 		      core_addr_to_string (addr), len, type,
 		      host_address_to_string (cond), (unsigned long) retval);
+  return retval;
+}
+
+static int
+debug_to_insert_mc_watchpoint (CORE_ADDR addr, int len, int type,
+			       struct expression *cond,
+			       int core_num)
+{
+  int retval;
+
+  retval = debug_target.to_insert_mc_watchpoint (addr, len, type, cond, core_num);
+
+  fprintf_unfiltered (gdb_stdlog,
+		  "target_insert_mc_watchpoint (0x%lx, %d, %d, %d) = %ld\n",
+		  (unsigned long) addr, len, type, core_num,
+		  (unsigned long) retval);
+  return retval;
+}
+
+static int
+debug_to_remove_mc_watchpoint (CORE_ADDR addr, int len, int type, 
+			       struct expression *cond,
+			       int core_num)
+{
+  int retval;
+
+  retval = debug_target.to_remove_mc_watchpoint (addr, len, type, cond, core_num);
+
+  fprintf_unfiltered (gdb_stdlog,
+		   "target_remove_mc_watchpoint (0x%lx, %d, %d %d) = %ld\n",
+		   (unsigned long) addr, len, type, core_num,
+		   (unsigned long) retval);
   return retval;
 }
 
@@ -4959,8 +5123,16 @@ setup_target_debug (void)
   current_target.to_can_use_hw_breakpoint = debug_to_can_use_hw_breakpoint;
   current_target.to_insert_hw_breakpoint = debug_to_insert_hw_breakpoint;
   current_target.to_remove_hw_breakpoint = debug_to_remove_hw_breakpoint;
+  current_target.to_insert_mc_hw_breakpoint = debug_to_insert_mc_hw_breakpoint;
+  current_target.to_remove_mc_hw_breakpoint = debug_to_remove_mc_hw_breakpoint;
+  current_target.to_multicore_hw_breakpoint = debug_to_multicore_hw_breakpoint;
+  current_target.to_multicore_hw_watchpoint = debug_to_multicore_hw_watchpoint;
+  current_target.to_get_core_number = debug_to_get_core_number;
+  current_target.to_set_core_number = debug_to_set_core_number;
   current_target.to_insert_watchpoint = debug_to_insert_watchpoint;
   current_target.to_remove_watchpoint = debug_to_remove_watchpoint;
+  current_target.to_insert_mc_watchpoint = debug_to_insert_mc_watchpoint;
+  current_target.to_remove_mc_watchpoint = debug_to_remove_mc_watchpoint;
   current_target.to_stopped_by_watchpoint = debug_to_stopped_by_watchpoint;
   current_target.to_stopped_data_address = debug_to_stopped_data_address;
   current_target.to_watchpoint_addr_within_range

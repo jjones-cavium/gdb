@@ -1,0 +1,118 @@
+# Copyright 2007 Cavium Networks, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+#
+# Test hardware watchpoints on accessing parts of the memory location of 
+# a variable that is being watched. Also test accessing outside the boundary.
+#
+if ![istarget "mipsisa64-octeon-*"] then {
+  return -1;
+}
+
+set testfile "wp-2"
+set srcfile ${testfile}.c
+set binfile ${objdir}/${subdir}/${testfile}.out
+
+if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable \
+       {debug nowarnings}] != "" } {
+  gdb_suppress_entire_file "Testcase compile failed, so all tests in this \
+file will automatically fail."
+}
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+if ![runto_main] then { fail "run to main" }
+
+# apply watchpoint 
+gdb_test "watch wp.y" \
+    "Hardware watchpoint 2: wp.y" \
+    "regular watchpoint"
+
+gdb_test_multiple "continue" "stopped at watchpoint" {
+    -re ".*Hardware watchpoint .*wp.y .*not stop here.*" {
+       fail "stopped at watchpoint"
+    }
+    -re ".*Hardware watchpoint .*wp.y.*Old.* = 0.*New.* = 20.*$gdb_prompt $" {
+       pass "stopped at watchpoint"
+    }
+    -re ".*$gdb_prompt $" {
+       fail "stopped at watchpoint"
+    }
+    timeout { fail "stopped at watchpoint (timeout)" }
+}
+  
+gdb_test "continue" \
+     ".*Continuing\\..*Hardware watchpoint \[0-9\]+: wp.y.*
+Old value = 20.*
+New value = 86.*" \
+     "stopped at accessing 3rd byte."
+
+gdb_test "continue" \
+     ".*Continuing\\..*Hardware watchpoint \[0-9\]+: wp.y.*
+Old value = 86.*
+New value = 1593835606.*" \
+    "stopped at accessing 1st byte."
+
+# Test awatch
+if ![runto_main] then { fail "run to main" }
+
+gdb_test "awatch wp.y" \
+    "Hardware access \\(read\\/write\\) watchpoint \[0-9\]+: wp.y.*" \
+    "awatch watchpoint"
+
+gdb_test "continue" \
+    ".*Hardware access \\(read\\/write\\) watchpoint \[0-9\]+: wp.y.*
+Old value = 0.*
+New value = 20.*" \
+    "stopped at store"
+
+gdb_test "continue" \
+    ".*Hardware access \\(read\\/write\\) watchpoint \[0-9\]+: wp.y.*
+Value = 20.*" \
+    "stopped at load"
+
+# Test rwatch
+gdb_test "rwatch wp.z" \
+   "Hardware read watchpoint \[0-9\]+: wp.z.*" \
+   "rwatch watchpoint"
+
+gdb_test "continue" \
+    ".*Hardware access \\(read\\/write\\) watchpoint \[0-9\]+: wp.y.*
+Old value = 20.*
+New value = 86.*" \
+    "stopped at second store"
+
+gdb_test "continue" \
+    ".*Hardware access \\(read\\/write\\) watchpoint \[0-9\]+: wp.y.*
+Value = 86.*" \
+    "stopped at second load"
+
+gdb_test "continue" \
+   ".*Hardware read watchpoint \[0-9\]+: wp.z.*
+Value = 30.*" \
+   "rwatch stopped at load"
+
+gdb_test "continue" \
+    ".*Hardware access \\(read\\/write\\) watchpoint \[0-9\]+: wp.y.*
+Old value = 86.*
+New value = 1593835606.*" \
+    "stopped at third store"
+
+gdb_test "continue" \
+   ".*Hardware read watchpoint \[0-9\]+: wp.z.*
+Value = 30.*" \
+   "rwatch stopped at next load"

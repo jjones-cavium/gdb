@@ -1,0 +1,65 @@
+# Set a hardware breakpoint.  Make sure, the second run stops at first 
+# hardware breakpoint.  Also for second run the step-mode should be on
+# while debugging multicore applications. 
+
+# (Re)run is only supported with PCI and with the simulator (in
+# sim-spawn mode).
+
+if {![string match "octeon-elf-pci*" [target_info name]]
+    && ![string match "octeon-elf-sim*" [target_info name]]} {
+    return -1
+}
+
+set testfile "second-run"
+set srcfile ${testfile}.c
+set binfile ${objdir}/${subdir}/${testfile}
+
+if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable \
+       {debug nowarnings}] != "" } {
+     fail "compilation"
+     return
+}
+pass "compilation"
+
+gdb_exit
+gdb_start
+
+set OCTEON_NUMCORES 2
+# Have gdb spawn the simulator to enable rerun.
+set OCTEON_SPAWN_SIM 1
+
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+#disable the checks in gdb_test_multiple so we can allow run to work.
+set use_gdb_stub 0
+
+gdb_test "set step-all on"
+gdb_test "set active-cores"
+
+gdb_test "hbreak g" \
+     "Hardware assisted breakpoint 1 at.* file .*$srcfile, line.*" \
+     "set hardware instruction breakpoint"
+
+for {set i 0} {$i < 15} {incr i} {
+    if {$i == 0} {
+	set test "run to hardware instruction breakpoint"
+    } else {
+	set test "rerun to hardware instruction breakpoint $i"
+    }
+    gdb_test_multiple "run" "$test" {
+	-re "The program .* has been started already.*y or n. $" {
+	    send_gdb "y\n"
+	    exp_continue
+	}
+	-re ".*Breakpoint 1, g .* at .*$srcfile.*$gdb_prompt $" {
+	    pass "$test"
+	}
+	-re ".*$gdb_prompt $" {
+	    fail "$test"
+	}
+	timeout {
+	    fail "$test (timeout)"
+	}
+    }
+}

@@ -1,0 +1,60 @@
+# Copyright 2007 Cavium Networks, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  
+
+# If the target command is invoked as "target octeonpci bootoct" then the
+# debugger uses default address to load the program.
+
+if {![string match "octeon-elf-pci*" [target_info name]]} {
+    return
+}
+
+set testfile "pci-attach"
+set srcfile ${testfile}.c
+set binfile ${objdir}/${subdir}/${testfile}
+
+if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable \
+       {debug nowarnings}] != "" } {
+     fail "compilation"
+     return
+}
+
+pass "compilation"
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_file_cmd ${binfile}
+
+send_gdb "target octeonpci bootoct\n"
+gdb_expect 30 {
+    -re "Found Octeon.*bootoct 21000000 debug.*$gdb_prompt $" { }
+    timeout { return -1 }
+}
+
+gdb_test "break main" \
+    "Breakpoint.*at.* file .*$srcfile, line.*" \
+    "breakpoint function"
+
+send_gdb "run\n"
+gdb_expect {
+     -re ".*Breakpoint \[0-9\]+, .*main.*$gdb_prompt $" {
+        pass "run to breakpoint"
+     }
+    -re ".*$gdb_prompt" {
+        fail "run to breakpoint"
+    }
+    timeout { fail "run to breakpoint (timeout)" }
+}

@@ -3615,8 +3615,9 @@ remove_breakpoint_1 (struct bp_location *bl, insertion_state_t is)
 		/* Ignore any failures: if the LMA is in ROM, we will
 		   have already warned when we failed to insert it.  */
 		if (bl->loc_type == bp_loc_hardware_breakpoint)
-		  target_remove_hw_breakpoint (bl->gdbarch,
-					       &bl->overlay_target_info);
+		  target_remove_mc_hw_breakpoint (bl->gdbarch,
+						  &bl->overlay_target_info,
+						  bl->owner->core_number);
 		else
 		  target_remove_breakpoint (bl->gdbarch,
 					    &bl->overlay_target_info);
@@ -4051,6 +4052,10 @@ breakpoint_thread_match (struct address_space *aspace, CORE_ADDR pc,
 	  if (bl->owner->task != task)
 	    continue;
         }
+
+      if (bl->owner->core_number != -1
+	  && bl->owner->core_number != target_get_core_number ())
+	continue;
 
       if (overlay_debugging 
 	  && section_is_overlay (bl->section)
@@ -5910,8 +5915,20 @@ print_one_breakpoint_location (struct breakpoint *b,
   annotate_field (1);
   if (part_of_multiple)
     ui_out_field_skip (uiout, "type");
-  else
-    ui_out_field_string (uiout, "type", bptype_string (b->type));
+  else 
+    {
+      /* Print the core number that the breakpoint applied to.  */
+      if (b->core_number != -1)
+	{
+	  const char *bp_type = bptype_string (b->type);
+	  char *p = xmalloc (strlen (bp_type) + 12);
+	  sprintf (p, "core #%d %s", b->core_number, bp_type);
+	  ui_out_field_string (uiout, "type", p);
+	}
+      else
+	ui_out_field_string (uiout, "type",
+			     bptype_string(b->type));
+    }
 
   /* 3 */
   annotate_field (2);
@@ -6978,6 +6995,8 @@ init_raw_breakpoint_without_location (struct breakpoint *b,
   b->commands = NULL;
   b->frame_id = null_frame_id;
   b->condition_not_parsed = 0;
+  b->core_number = -1;
+  b->momentary = 0;
   b->py_bp_object = NULL;
   b->related_breakpoint = b;
 }
@@ -8612,7 +8631,11 @@ hw_breakpoint_used_count (void)
 
   ALL_BREAKPOINTS (b)
   {
-    if (b->type == bp_hardware_breakpoint && breakpoint_enabled (b))
+    if (b->type == bp_hardware_breakpoint && breakpoint_enabled (b)
+	/* Also ignore if breakpoint is core-specific and does not belong to
+	   the current core.  */
+        && (b->core_number == -1
+	    || b->core_number == target_get_core_number ()))
       for (bl = b->loc; bl; bl = bl->next)
 	{
 	  /* Special types of hardware breakpoints may use more than
@@ -8744,6 +8767,9 @@ set_momentary_breakpoint (struct gdbarch *gdbarch, struct symtab_and_line sal,
      control.  */
   if (in_thread_list (inferior_ptid))
     b->thread = pid_to_thread_id (inferior_ptid);
+
+  if (target_multicore_hw_breakpoint ())
+    b->core_number = target_get_core_number ();
 
   update_global_location_list_nothrow (1);
 
@@ -9058,6 +9084,15 @@ init_breakpoint_sal (struct breakpoint *b, struct gdbarch *gdbarch,
 	{
 	  init_raw_breakpoint (b, gdbarch, sal, type, ops);
 	  b->thread = thread;
+
+	  /* If hardware breakpoint is core-specific record the core
+	     number.  */
+	  if (target_multicore_hw_breakpoint ()
+	      && b->type == bp_hardware_breakpoint)
+	    b->core_number = target_get_core_number ();
+	  else
+	    b->core_number = -1;
+
 	  b->task = task;
 
 	  b->cond_string = cond_string;
@@ -10430,8 +10465,8 @@ insert_watchpoint (struct bp_location *bl)
   struct watchpoint *w = (struct watchpoint *) bl->owner;
   int length = w->exact ? 1 : bl->length;
 
-  return target_insert_watchpoint (bl->address, length, bl->watchpoint_type,
-				   w->cond_exp);
+  return target_insert_mc_watchpoint (bl->address, length, bl->watchpoint_type,
+				      w->cond_exp, w->base.core_number);
 }
 
 /* Implement the "remove" breakpoint_ops method for hardware watchpoints.  */
@@ -10442,8 +10477,8 @@ remove_watchpoint (struct bp_location *bl)
   struct watchpoint *w = (struct watchpoint *) bl->owner;
   int length = w->exact ? 1 : bl->length;
 
-  return target_remove_watchpoint (bl->address, length, bl->watchpoint_type,
-				   w->cond_exp);
+  return target_remove_mc_watchpoint (bl->address, length, bl->watchpoint_type,
+				      w->cond_exp, w->base.core_number);
 }
 
 static int
@@ -10462,6 +10497,14 @@ breakpoint_hit_watchpoint (const struct bp_location *bl,
      (did not match the data address).  */
   if (is_hardware_watchpoint (b)
       && w->watchpoint_triggered == watch_triggered_no)
+    return 0;
+
+  /* Process the hardware breakpoint that belongs to the focused core.  The
+     debugger reads the registers/memory location to display the value of
+     the variable that is changed.  The value of the variable read will have
+     incorrect value if it is not the focused core.  */
+  if (is_hardware_watchpoint (b)
+      && b->core_number != target_get_core_number ())
     return 0;
 
   return 1;
@@ -11135,6 +11178,15 @@ watch_command_1 (const char *arg, int accessflag, int from_tty,
     b->cond_string = savestring (cond_start, cond_end - cond_start);
   else
     b->cond_string = 0;
+
+  /* If hardware watchpoint is core-specific record the core number.  */
+  if (target_multicore_hw_watchpoint () 
+      && (b->type == bp_hardware_watchpoint
+	  || b->type == bp_access_watchpoint
+	  || b->type == bp_read_watchpoint))
+    b->core_number = target_get_core_number ();
+  else
+    b->core_number = -1;
 
   if (frame)
     {
@@ -12983,8 +13035,9 @@ static int
 bkpt_insert_location (struct bp_location *bl)
 {
   if (bl->loc_type == bp_loc_hardware_breakpoint)
-    return target_insert_hw_breakpoint (bl->gdbarch,
-					&bl->target_info);
+    return target_insert_mc_hw_breakpoint (bl->gdbarch,
+					   &bl->target_info,
+					   bl->owner->core_number);
   else
     return target_insert_breakpoint (bl->gdbarch,
 				     &bl->target_info);
@@ -12994,7 +13047,8 @@ static int
 bkpt_remove_location (struct bp_location *bl)
 {
   if (bl->loc_type == bp_loc_hardware_breakpoint)
-    return target_remove_hw_breakpoint (bl->gdbarch, &bl->target_info);
+    return target_remove_mc_hw_breakpoint (bl->gdbarch, &bl->target_info,
+					   bl->owner->core_number);
   else
     return target_remove_breakpoint (bl->gdbarch, &bl->target_info);
 }

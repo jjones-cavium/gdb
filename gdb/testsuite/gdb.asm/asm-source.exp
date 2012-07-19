@@ -161,6 +161,13 @@ switch -glob -- [istarget] {
     }
 }
 
+#Octeon elf target requires newlib for the debugger stub
+#so we cannot test it.
+if { [istarget "mips*-octeon-elf*"] } {
+    untested asm-source.exp
+    return -1
+}
+
 if { "${asm-arch}" == "" } {
     untested asm-source.exp
     return -1

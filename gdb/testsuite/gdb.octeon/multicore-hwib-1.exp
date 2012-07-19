@@ -1,0 +1,135 @@
+# Copyright 2007 Cavium Networks, Inc.
+#
+# Test debugging the kernel.  We assume that the variable KERNEL
+# points to the kernel.
+ 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# Test multicore hardware instruction breakpoints. Insert only hardware
+# breakpoints, one in each core. And one software breakpoint in common code.
+#
+if ![istarget "mipsisa64-octeon-*"] then {
+  return -1
+}
+
+set testfile "multicore-hwib-1"
+set srcfile ${testfile}.c
+set binfile ${testfile}.out
+
+# build simple exec app
+set binfile [ cvmx_compile $binfile $srcdir/$subdir $srcfile "" "-g" "" "" ]
+
+if { $binfile == "" } {
+  fail "compilation"
+  return
+}
+
+pass "compilation"
+
+global octeon_core0_prompt
+global octeon_core1_prompt
+
+gdb_exit
+gdb_start
+set OCTEON_NUMCORES 2
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+set hwbp_location_core1 [gdb_get_line_number "set core1 hbreak here"]
+set hwbp_location_core0 [gdb_get_line_number "set core0 hbreak here"]
+set bp_location_common [gdb_get_line_number "set common breakpoint here"]
+
+# Insert hardware breakpoint at the line number that will be executed only
+# by core #1
+gdb_test "set focus 1"
+
+gdb_test "hbreak ${srcfile}:$hwbp_location_core1" \
+     "Hardware assisted breakpoint 1 at.* file .*$srcfile, line.*" \
+     "hardware instruction breakpoint 1"
+
+# Insert hardware breakpoint at the line number that will be executed only
+# by Core #0.
+gdb_test "set focus 0"
+
+gdb_test "hbreak ${srcfile}:$hwbp_location_core0" \
+     "Hardware assisted breakpoint 2 at.* file .*$srcfile, line.*" \
+     "hardware instruction breakpoint 2"
+
+# Insert breakpoint at the end of the program (common breakpoint)
+gdb_test "break ${srcfile}:$bp_location_common"
+
+gdb_test "set step-all on"
+gdb_test "set active-cores"
+gdb_test "set focus 0"
+
+gdb_test "info break" \
+     "Num +Type +Disp Enb Address +What.*
+\[0-9\]+.*core \#1 hw breakpoint.*keep\[ \t\]+y.*$srcfile:$hwbp_location_core1.*
+\[0-9\]+.*core \#0 hw breakpoint.*keep\[ \t\]+y.*$srcfile:$hwbp_location_core0.*" \
+     "info break"
+
+gdb_run_cmd
+gdb_expect {
+     -re ".*.*Breakpoint \[0-9\]+, .*foo.* .*$srcfile:$hwbp_location_core0.*$octeon_core0_prompt $" {
+	pass "Core hit first breakpoint"
+     }
+     -re ".*Breakpoint \[0-9\]+, .*foo.* .*$srcfile:$hwbp_location_core1.*$octeon_core1_prompt $" {
+	pass "Core hit first breakpoint"
+     }
+     -re ".*$gdb_prompt $" {
+	fail "Core hit first breakpoint"
+     }
+     timeout { fail "Core hit first breakpoint (timeout)" }
+}
+
+gdb_test_multiple "continue" "Core hit second breakpoint" {
+     -re ".*Continuing\\..*Breakpoint \[0-9\]+, .*foo.* .*$srcfile:$hwbp_location_core0.*$octeon_core0_prompt $" {
+	pass "Core hit second breakpoint"
+     }
+     -re ".*Continuing\\..*Breakpoint \[0-9\]+, .*foo.* .*$srcfile:$hwbp_location_core1.*$octeon_core1_prompt $" {
+	pass "Core hit second breakpoint"
+     }
+     -re ".*$gdb_prompt $" {
+	fail "Core hit second breakpoint"
+     }
+     timeout { fail "Core hit second breakpoint (timeout)" }
+}
+
+gdb_test_multiple "continue" "Core hit third breakpoint" {
+     -re ".*Continuing\\..*Breakpoint \[0-9\]+, .*main.* .*$srcfile:$bp_location_common.*$gdb_prompt $" {
+	pass "Core hit third breakpoint"
+     }
+     -re ".*$gdb_prompt $" {
+	fail "Core hit third breakpoint"
+     }
+     timeout { fail "Core hit third breakpoint (timeout)" }
+}
+
+# Rerun the program to make sure the core stop at hardware breakpoint.
+gdb_run_cmd
+gdb_expect {
+     -re ".*Breakpoint \[0-9\]+, .*foo.* .*$srcfile:$hwbp_location_core0.*$octeon_core0_prompt $" {
+	pass "Rerun hit hardware breakpoint"
+     }
+     -re ".*Breakpoint \[0-9\]+, .*foo.* .*$srcfile:$hwbp_location_core1.*$octeon_core1_prompt $" {
+	pass "Rerun hit hardware breakpoint"
+     }
+     -re ".*$gdb_prompt $" {
+	fail "Rerun hit hardware breakpoint"
+     }
+     timeout { fail "Rerun hit hardware breakpoint (timeout)" }
+}
+
+gdb_test "info break" \
+     "Num +Type +Disp Enb Address +What.*
+\[0-9\]+.*core \#1 hw breakpoint.*keep\[ \t\]+y.*$srcfile:$hwbp_location_core1.*
+\[0-9\]+.*core \#0 hw breakpoint.*keep\[ \t\]+y.*$srcfile:$hwbp_location_core0.*" \
+     "info break after rerun"

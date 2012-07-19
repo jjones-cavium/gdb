@@ -1,0 +1,56 @@
+#   Copyright 2007 Cavium Networks, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+#
+# Test backtrace from frameless function.
+#
+if ![istarget "mipsisa64-octeon-*"] then {
+  return -1;
+}
+
+set testfile "bt-1"
+set srcfile ${testfile}.s
+set binfile ${testfile}.out
+
+if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable ""  ] != "" } {
+     fail "compilation"
+     return
+}
+
+pass "compilation"
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+runto_main
+
+gdb_test "break bar" \
+    "Breakpoint.*at.*" \
+    "breakpoint at bar"
+
+gdb_test "continue" \
+     ".*Continuing\\..*Breakpoint \[0-9\]+, .*bar.*" \
+     "continue to bar"
+
+gdb_test_multiple "backtrace" "backtrace from bar" {
+     -re ".*#2.*$gdb_prompt $" {
+	fail "backtrace from bar"
+     }
+     -re "#0.*in bar ().*#1.*in foo ().*$gdb_prompt $" {
+	pass "backtrace from bar"
+     }
+     timeout { fail "backtrace from bar (timeout)" }
+}

@@ -755,6 +755,14 @@ struct breakpoint
        the condition in.  */
     int condition_not_parsed;
 
+    /* For multi-core debugging, the core number on which the breakpoint
+       is set.  -1 if not using multi-core debugging or if breakpoint is
+       set on all cores.  */
+    int core_number;
+
+    /* This was a momentary breakpoint. */
+    int momentary;
+
     /* With a Python scripting enabled GDB, store a reference to the
        Python object that has been associated with this breakpoint.
        This is always NULL for a GDB that is not script enabled.  It

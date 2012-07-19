@@ -14131,6 +14131,15 @@ ac_config_links="$ac_config_links $ac_config_links_1"
 $as_echo "#define GDB_DEFAULT_HOST_CHARSET \"UTF-8\"" >>confdefs.h
 
 
+case "${target}" in
+   mipsisa64*-octeon-elf* )
+
+cat >>confdefs.h <<_ACEOF
+#define DEFAULT_PROMPT "(Core\0430-gdb) "
+_ACEOF
+ ;;
+esac
+
 ac_config_files="$ac_config_files Makefile gdb-gdb.gdb doc/Makefile data-directory/Makefile"
 
 ac_config_commands="$ac_config_commands default"

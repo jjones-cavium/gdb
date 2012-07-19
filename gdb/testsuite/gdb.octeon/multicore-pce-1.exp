@@ -1,0 +1,236 @@
+# Copyright 2007 Cavium Networks, Inc.
+#
+# Test debugging the kernel.  We assume that the variable KERNEL
+# points to the kernel.
+ 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# Test performance counter events for "clk", "lds" in core A and "sissue",
+# "uload" in core B. The performance counter for "uload" event should not 
+# change. Change the focus and check if the events are set properly.
+#
+if ![istarget "mipsisa64-octeon-*"] then {
+  return -1;
+}
+
+set testfile "multicore-pce-1"
+set srcfile ${testfile}.c
+set binfile ${testfile}.out
+
+# build simple exec app
+set binfile [ cvmx_compile $binfile $srcdir/$subdir $srcfile "" "-g" "" "" ]
+
+if { $binfile == "" } {
+  fail "compilation"
+  return;
+}
+
+pass "compilation"
+
+gdb_exit
+gdb_start
+set OCTEON_NUMCORES 2
+set OCTEON_SIM_PERF 1
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+gdb_test "set step-all on"
+gdb_test "set active-cores"
+
+set bp_location_1 [gdb_get_line_number "core0 break here"]
+set bp_location_2 [gdb_get_line_number "core1 break here"]
+set bp_location_3 [gdb_get_line_number "set common breakpoint here"]
+
+# Set one common breakpoint
+gdb_test "break ${srcfile}:$bp_location_3"
+
+# Set hardware breakpoint in core A
+gdb_test "set focus 0"
+gdb_test "hbreak ${srcfile}:$bp_location_1"
+# Set hardware breakpoint in core B
+gdb_test "set focus 1"
+gdb_test "hbreak ${srcfile}:$bp_location_2"
+
+set stopped_core 0
+
+gdb_run_cmd
+gdb_expect {
+     -re ".*Breakpoint \[0-9\]+,.*${srcfile}:$bp_location_1.*$gdb_prompt $" {
+	set stopped_core 0
+        pass "run to breakpoint"
+     }
+     -re ".*Breakpoint \[0-9\]+,.*${srcfile}:$bp_location_2.*$gdb_prompt $" {
+	set stopped_core 1
+        pass "run to breakpoint"
+     }
+    -re ".*$gdb_prompt $" {
+        fail "run to breakpoint"
+    }
+    timeout { fail "run to breakpoint (timeout)" }
+}
+
+gdb_test "set step-all off"
+
+gdb_test "show perf-event0" \
+     "Performance counter0 event is not set." \
+     "Performance event0 is not set"
+
+# Set performance counter events in core A
+# Set performance counter event0 to "clk"
+gdb_test "set perf-event0 clk"
+
+# Set performance counter event1 to "lds"
+gdb_test "set perf-event1 lds"
+
+# check the performance counter events status
+gdb_test "show perf-event0" \
+     "Performance counter0 for \"clk\" event is 0.*" \
+     "Event0 initial value for clk event"
+
+gdb_test "show perf-event1" \
+     "Performance counter1 for \"lds\" event is 0.*" \
+     "Event1 initial value for lds event"
+
+set clk_counter 0
+set lds_counter 0
+
+gdb_test "continue" \
+    ".*Continuing\\..*Breakpoint \[0-9\]+,.*${srcfile}:${bp_location_3}.*" \
+    "continue to check performance counter events changed in core A"
+
+# Check the performance counter events
+send_gdb "show perf-event0\n"
+gdb_expect {
+    -re ".*counter0 for \"clk\" event is \(\[0-9\]+\).*$gdb_prompt $"  {
+	set clk_counter $expect_out(1,string)
+	if { $clk_counter != 0 } {
+            pass "Event0 status for clk event changed"
+	} else {
+	    fail "Event0 status for clk event changed"
+	}
+    }
+    -re ".*$gdb_prompt $" {
+	fail "Event0 status for clk event changed"
+    }
+    timeout { fail "Event0 status for clk event changed (timeout)" } 
+}
+
+send_gdb "show perf-event1\n" 
+gdb_expect {
+    -re ".*counter1 for \"lds\" event is \(\[0-9\]+\).*$gdb_prompt $" {
+	set lds_counter $expect_out(1,string)
+	if { $lds_counter != 0 } { 
+	    pass "Event1 status for lds event changed"
+	} else {
+	    pass "Event1 status for lds event changed"
+	}
+    }
+    -re ".*$gdb_prompt $" {
+	fail "Event1 status for lds event changed"
+    }
+    timeout { fail "Event1 status for lds event changed (timeout)" }
+}
+
+# Now set performance counter events in core B by changing the focus
+if { $stopped_core == 0 } { 
+    gdb_test "set focus 1" 
+    set bp_location $bp_location_2
+} else {
+    gdb_test "set focus 0" 
+    set bp_location $bp_location_1
+}
+
+# check the performance counter events status
+gdb_test "show perf-event0" \
+     "Performance counter0 for .*event is 0.*" \
+     "Event0 initial value is correct in core B"
+
+gdb_test "show perf-event1" \
+     "Performance counter1 for .*event is 0.*" \
+     "Event1 initial value is correct in core B"
+
+# Set performance counter event0 to "sissue"
+gdb_test "set perf-event0 sissue"
+
+# Set performance counter event1 to "uload"
+gdb_test "set perf-event1 uload"
+
+set ssisue_counter 0
+set uload_counter 0
+
+gdb_test "continue" \
+    ".*Continuing\\..*Breakpoint \[0-9\]+,.*${srcfile}:${bp_location}.*" \
+    "continue to check performance counter events changed in core B"
+
+send_gdb "show perf-event0\n"
+gdb_expect {
+    -re ".*counter0 for \"sissue\" event is \(\[0-9\]+\).*$gdb_prompt $" {
+	set ssissue_counter $expect_out(1,string)
+	if { $ssissue_counter != 0 } { 
+	    pass "Event0 status for sissue event changed"
+	} else { 
+	    fail "Event0 status for sissue event changed"
+	}
+    }
+    -re ".*$gdb_prompt $" {
+	fail "Event0 status for sissue event changed"
+    }
+    timeout { fail "Event0 status for sissue event changed (timeout)" }
+}
+
+send_gdb "show perf-event1\n"
+gdb_expect {
+    -re ".*counter1 for \"uload\" event is \(\[0-9\]+\).*$gdb_prompt $" {
+	set uload_counter $expect_out(1,string)
+	if { $uload_counter == 0 } { 
+	    pass "Event1 status for uload event not changed" 
+	} else { 
+	    fail "Event1 status for uload event not changed" 
+	}
+    }
+    -re ".*$gdb_prompt $" {
+	fail "Event1 status for uload event not changed"
+    }
+    timeout { fail "Event1 status for uload event not changed (timeout)" }
+}
+
+# Go back to core A and make sure the events are correct.
+gdb_test "set focus $stopped_core" 
+
+send_gdb "show perf-event0\n"
+gdb_expect {
+    -re ".*counter0 for \"clk\" event is \(\[0-9\]+\).*$gdb_prompt $"  {
+	if { $clk_counter == $expect_out(1,string) } {
+            pass "Event0 status for clk event changed again"
+	} else {
+	    fail "Event0 status for clk event changed again"
+	}
+    }
+    -re ".*$gdb_prompt $" {
+	fail "Event0 status for clk event changed again"
+    }
+    timeout { fail "Event0 status for clk event changed again (timeout)" } 
+}
+
+send_gdb "show perf-event1\n" 
+gdb_expect {
+    -re ".*counter1 for \"lds\" event is \(\[0-9\]+\).*$gdb_prompt $" {
+	if { $lds_counter == $expect_out(1,string) } { 
+	    pass "Event1 status for lds event changed again"
+	} else {
+	    fail "Event1 status for lds event changed again"
+	}
+    }
+    -re ".*$gdb_prompt $" {
+	fail "Event1 status for lds event changed again"
+    }
+    timeout { fail "Event1 status for lds event changed again (timeout)" }
+}

@@ -1,0 +1,50 @@
+load_lib libgloss.exp
+
+# Return the focus of the core that is being debugged. 
+
+proc get_focus {} {
+   global gdb_prompt
+
+   send_gdb "show focus\n"
+   gdb_expect 30 {
+       -re "The currently debugged core is \(\[0-9\]+\).*$gdb_prompt $" {
+	   set focus_core $expect_out(1,string);
+	   verbose "focus_core: $focus_core"
+	   pass "show focus"
+	   return $focus_core
+       }
+       timeout {
+	   fail "show focus (timeout)"
+	   return -1
+       }
+    }
+}
+
+# Change the focus to the specified core.
+
+proc change_focus {focus_core} {
+    global gdb_prompt
+
+    if {$focus_core > 4} {
+	send_error "ERROR: change_focus only support changing to core <= 4\n"
+	fail "focus changed to $focus_core"
+	return;
+    }
+
+    set var octeon_core${focus_core}_prompt
+    global $var
+    eval set prompt \$$var
+
+    send_gdb "set focus $focus_core\n"
+    gdb_expect 30 {
+	-re ".*Core is not in the exception handler.*$gdb_prompt $" {
+	    fail "focus changed to $focus_core"
+	}
+	-re ".*$prompt $" {
+	    pass "focus changed to $focus_core"
+	}
+	timeout {
+	    fail "focus changed to $focus_core (timeout)"
+	}
+    }
+}

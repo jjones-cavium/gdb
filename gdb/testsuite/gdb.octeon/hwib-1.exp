@@ -1,0 +1,154 @@
+#   Copyright 2007 Cavium Networks, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+#
+# Test hardware instruction breakpoints, also test enabling, disabling hardware 
+# breakpoints and re-run to hardware breakpoints.
+#
+if ![istarget "mipsisa64-octeon-*"] then {
+  return -1;
+}
+
+set testfile "hwib-1"
+set srcfile ${testfile}.c
+set binfile ${testfile}.out
+
+# build simple exec app
+set binfile [ cvmx_compile $binfile $srcdir/$subdir $srcfile "" "-g" "" "" ]
+
+if { $binfile == "" } {
+  fail "compilation"
+  return;
+}
+
+pass "compilation"
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+gdb_test "break main" \
+    "Breakpoint.*at.* file .*$srcfile, line.*" \
+    "breakpoint function"
+
+gdb_run_cmd
+gdb_expect {
+     -re ".*Breakpoint \[0-9\]+, .*main.*$gdb_prompt $" {
+        pass "run to breakpoint"
+     }
+    -re ".*$gdb_prompt" {
+        fail "run to breakpoint"
+    }
+    timeout { fail "run to breakpoint (timeout)" }
+}
+
+set hwbp_location_1 [gdb_get_line_number "set hbreak1 here"]
+set hwbp_location_2 [gdb_get_line_number "set hbreak2 here"]
+set hwbp_location_3 [gdb_get_line_number "set hbreak3 here"]
+set bp_location_common [gdb_get_line_number "set common breakpoint here"]
+
+#
+# test hardware breakpoints
+#
+gdb_test "hbreak ${srcfile}:$hwbp_location_1" \
+     "Hardware assisted breakpoint 2 at.* file .*$srcfile, line.*" \
+     "hardware instruction breakpoint 1"
+
+gdb_test "hbreak ${srcfile}:$hwbp_location_2" \
+     "Hardware assisted breakpoint 3 at.* file .*$srcfile, line.*" \
+     "hardware instruction breakpoint 2"
+
+gdb_test "hbreak ${srcfile}:$hwbp_location_3" \
+     "Hardware assisted breakpoint 4 at.* file .*$srcfile, line.*" \
+     "hardware instruction breakpoint 3"
+
+gdb_test "hbreak ${srcfile}:$bp_location_common" \
+     "Hardware assisted breakpoint 5 at.* file .*$srcfile, line.*" \
+     "hardware instruction breakpoint 4" 
+
+gdb_test "info break" \
+     "Num +Type +Disp Enb Address +What.*
+\[0-9\]+\[\t \]+breakpoint.*keep\[ \t\]+y.*in main.*$srcfile.*
+\[0-9\]+.*core \#0 hw breakpoint.*keep\[ \t\]+y.*$srcfile:$hwbp_location_1.*
+\[0-9\]+.*core \#0 hw breakpoint.*keep\[ \t\]+y.*$srcfile:$hwbp_location_2.*
+\[0-9\]+.*core \#0 hw breakpoint.*keep\[ \t\]+y.*$srcfile:$hwbp_location_3.*
+\[0-9\]+.*core \#0 hw breakpoint.*keep\[ \t\]+y.*$srcfile:$bp_location_common.*" \
+     "breakpoint info"
+
+gdb_test "hbreak 1" \
+     "Octeon supports only four hardware breakpoints.*
++Hardware breakpoints used exceeds limit.*" \
+     "hardware instruction breakpoint exceeds limit"
+
+gdb_test_multiple "continue" "hit first hardware breakpoint" {
+     -re ".*Continuing\\..*Breakpoint \[0-9\]+, .*$srcfile:$hwbp_location_1.*" {
+	pass "hit first hardware breakpoint"
+     }
+     -re ".*$gdb_prompt $" {
+        fail "hit first hardware breakpoint"
+     }
+     timeout { fail "hit first hardware breakpoint (timeout)" }
+}
+
+gdb_test "disable 2"
+
+gdb_test "info break" \
+     "Num +Type +Disp Enb Address +What.*
+\[0-9\]+\[\t \]+breakpoint .*keep\[ \t\]+y.*in main.*$srcfile.*
+\[0-9\]+.*core \#0 hw breakpoint.*keep\[ \t\]+n.*$srcfile:$hwbp_location_1.*
+\[0-9\]+.*core \#0 hw breakpoint.*keep\[ \t\]+y.*$srcfile:$hwbp_location_2.*
+\[0-9\]+.*core \#0 hw breakpoint.*keep\[ \t\]+y.*$srcfile:$hwbp_location_3.*
+\[0-9\]+.*core \#0 hw breakpoint.*keep\[ \t\]+y.*$srcfile:$bp_location_common.*" \
+     "breakpoint info after disable"
+
+gdb_test_multiple "continue" "continue after disabling breakpoint" {
+     -re ".*Continuing\\..*Breakpoint \[0-9\]+, .*$srcfile:$hwbp_location_2.*" {
+	pass "continue after disabling breakpoint"
+     }
+     -re ".*$gdb_prompt $" {
+        fail "continue after disabling breakpoint"
+     }
+     timeout { fail "continue after disabling breakpoint (timeout)" }
+}
+
+gdb_test "enable 2"
+
+gdb_test "info break" \
+     "Num +Type +Disp Enb Address +What.*
+\[0-9\]+\[\t \]+breakpoint .*keep\[ \t\]+y.*in main.*$srcfile.*
+\[0-9\]+.*core \#0 hw breakpoint.*keep\[ \t\]+y.*$srcfile:$hwbp_location_1.*
+\[0-9\]+.*core \#0 hw breakpoint.*keep\[ \t\]+y.*$srcfile:$hwbp_location_2.*
+\[0-9\]+.*core \#0 hw breakpoint.*keep\[ \t\]+y.*$srcfile:$hwbp_location_3.*
+\[0-9\]+.*core \#0 hw breakpoint.*keep\[ \t\]+y.*$srcfile:$bp_location_common.*" \
+     "breakpoint info after enable"
+
+gdb_test "continue" \
+     ".*Continuing\\..*Breakpoint \[0-9\]+, .*$srcfile:$hwbp_location_1.*" \
+     "continue after enabling breakpoint"
+
+# Before rerun, disable software breakpoints to make sure the rerun stops
+# at hardware breakpoint.
+gdb_test "disable 1"
+
+gdb_run_cmd 
+gdb_expect {
+     -re ".*Breakpoint \[0-9\]+, .*$srcfile:$hwbp_location_1.*$gdb_prompt $" {
+        pass "rerun to hardware breakpoint"
+     }
+    -re ".*$gdb_prompt $" {
+        fail "rerun to hardware breakpoint"
+    }
+    timeout { fail "rerun to hardware breakpoint (timeout)" }
+}

@@ -466,6 +466,12 @@ struct target_ops
     int (*to_ranged_break_num_registers) (struct target_ops *);
     int (*to_insert_hw_breakpoint) (struct gdbarch *, struct bp_target_info *);
     int (*to_remove_hw_breakpoint) (struct gdbarch *, struct bp_target_info *);
+    int (*to_insert_mc_hw_breakpoint) (struct gdbarch *, struct bp_target_info *, int);
+    int (*to_remove_mc_hw_breakpoint) (struct gdbarch *, struct bp_target_info *, int);
+    int (*to_multicore_hw_breakpoint) (void);
+    int (*to_multicore_hw_watchpoint) (void);
+    int (*to_get_core_number) (void);
+    void (*to_set_core_number) (int);
 
     /* Documentation of what the two routines below are expected to do is
        provided with the corresponding target_* macros.  */
@@ -476,6 +482,8 @@ struct target_ops
 				      CORE_ADDR, CORE_ADDR, int);
     int (*to_remove_mask_watchpoint) (struct target_ops *,
 				      CORE_ADDR, CORE_ADDR, int);
+    int (*to_remove_mc_watchpoint) (CORE_ADDR, int, int, struct expression *, int);
+    int (*to_insert_mc_watchpoint) (CORE_ADDR, int, int, struct expression *, int);
     int (*to_stopped_by_watchpoint) (void);
     int to_have_steppable_watchpoint;
     int to_have_continuable_watchpoint;
@@ -1591,6 +1599,54 @@ extern char *target_thread_name (struct thread_info *);
    masked watchpoints are not supported, -1 for failure.  */
 
 extern int target_insert_mask_watchpoint (CORE_ADDR, CORE_ADDR, int);
+
+#ifndef target_multicore_hw_breakpoint
+#define target_multicore_hw_breakpoint() \
+     (*current_target.to_multicore_hw_breakpoint) ()
+#endif
+
+#ifndef target_multicore_hw_watchpoint
+#define target_multicore_hw_watchpoint() \
+     (*current_target.to_multicore_hw_watchpoint) ()
+#endif
+
+#ifndef target_get_core_number 
+#define target_get_core_number() \
+     (*current_target.to_get_core_number) ()
+#endif
+
+#ifndef target_set_core_number 
+#define target_set_core_number(core) \
+     (*current_target.to_set_core_number) (core)
+#endif
+
+#ifndef target_insert_mc_hw_breakpoint
+#define target_insert_mc_hw_breakpoint(gdbarch, bp_tgt, core_number) 		     \
+     ((*current_target.to_multicore_hw_breakpoint)()  		    	     \
+	? (*current_target.to_insert_mc_hw_breakpoint) (gdbarch, bp_tgt, core_number) \
+        : (*current_target.to_insert_hw_breakpoint) (gdbarch, bp_tgt))
+
+#define target_remove_mc_hw_breakpoint(gdbarch, bp_tgt, core_number) 		     \
+     ((*current_target.to_multicore_hw_breakpoint) ()			     \
+        ? (*current_target.to_remove_mc_hw_breakpoint) (gdbarch, bp_tgt, core_number) \
+        : (*current_target.to_remove_hw_breakpoint) (gdbarch, bp_tgt))
+#endif
+
+#ifndef target_insert_mc_watchpoint
+#define target_insert_mc_watchpoint(addr, len, type, cond, core_number)	   \
+     ((*current_target.to_multicore_hw_watchpoint)()			   \
+       ? (*current_target.to_insert_mc_watchpoint) (addr, len, type, cond,	   \
+						    core_number)	   \
+       : (*current_target.to_insert_watchpoint) (addr, len, type, cond))
+#endif
+
+#ifndef target_remove_mc_watchpoint
+#define target_remove_mc_watchpoint(addr, len, type, cond, core_number)	   \
+     ((*current_target.to_multicore_hw_watchpoint)()			   \
+       ? (*current_target.to_remove_mc_watchpoint) (addr, len, type, cond, \
+						    core_number)	   \
+       : (*current_target.to_remove_watchpoint) (addr, len, type, cond))
+#endif
 
 /* Remove a masked watchpoint at ADDR with the mask MASK.
    RW may be hw_read for a read watchpoint, hw_write for a write watchpoint

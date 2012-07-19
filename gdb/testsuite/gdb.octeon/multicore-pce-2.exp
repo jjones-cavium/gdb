@@ -1,0 +1,125 @@
+# Copyright 2007 Cavium Networks, Inc.
+#
+# Test debugging the kernel.  We assume that the variable KERNEL
+# points to the kernel.
+ 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# Test performance counter events for "uuload" in core #0 and "uustore" in
+# core #1. The performance counters are incremented for these events in
+# the cores the event is to. Make sure these events are not updated in
+# other core.
+#
+# The performance counters for "uuload/uustore" event increment whenever a
+# load happens on an unaligned address. This does not effect when accessing 
+# unaligned address using Octeon unaligned load/store insns. And the 
+# performance counters do not increment when the unaligned address resides 
+# entirely in 64-bits.
+#
+if ![istarget "mipsisa64-octeon-*"] then {
+  return -1;
+}
+
+set testfile "multicore-pce-2"
+set srcfile ${testfile}.c
+set binfile ${testfile}.out
+
+# build simple exec app
+set binfile [ cvmx_compile $binfile $srcdir/$subdir $srcfile "" "-g" "" "" ]
+
+if { $binfile == "" } {
+  fail "compilation"
+  return;
+}
+
+pass "compilation"
+
+global octeon_core0_prompt
+global octeon_core1_prompt
+
+gdb_exit
+gdb_start
+set OCTEON_NUMCORES 2
+set OCTEON_SIM_PERF 1
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+gdb_test "set step-all on"
+gdb_test "set active-cores"
+
+set bp_location [gdb_get_line_number "set common breakpoint here"]
+
+gdb_test "break $srcfile:$bp_location"
+
+# Set the same performance counters in both the cores.
+gdb_test "set focus 0"
+gdb_test "set perf-event0 uuload"
+gdb_test "set perf-event1 uustore"
+
+gdb_test "set focus 1"
+gdb_test "set perf-event0 uuload"
+gdb_test "set perf-event1 uustore"
+
+gdb_test "continue" \
+    ".*Continuing\\..*Breakpoint \[0-9\]+,.*$srcfile:$bp_location.*" \
+    "continue to check performance counter events changed in core A"
+
+gdb_test "continue" \
+    ".*Continuing\\..*Breakpoint \[0-9\]+,.*$srcfile:$bp_location.*" \
+    "continue to check performance counter events changed in core B"
+
+# Check the performance counter events in core A
+gdb_test "set focus 0"
+send_gdb "show perf-event0\n"
+gdb_expect {
+    -re ".*counter0 for \"uuload\" event is 1\[^\n\]+.*$octeon_core0_prompt $"  {
+	pass "Event0 status for uuload event in core A"
+    }
+    -re ".*$gdb_prompt $" {
+	fail "Event0 status for uuload event in core A"
+    }
+    timeout { fail "Event0 status for uuload event in core A (timeout)" } 
+}
+
+send_gdb "show perf-event1\n"
+gdb_expect {
+    -re ".*counter1 for \"uustore\" event is 0.*$octeon_core0_prompt $"  {
+	pass "Event1 status for uustore event in core A"
+    }
+    -re ".*$gdb_prompt $" {
+	fail "Event1 status for uustore event in core A"
+    }
+    timeout { fail "Event1 status for uustore event in core A (timeout)" } 
+}
+
+# Check the performance counter events in core B
+gdb_test "set focus 1"
+send_gdb "show perf-event0\n"
+gdb_expect {
+    -re ".*counter0 for \"uuload\" event is 0.*$octeon_core1_prompt $"  {
+	pass "Event0 status for uuload event in core B"
+    }
+    -re ".*$gdb_prompt $" {
+	fail "Event0 status for uuload event in core B"
+    }
+    timeout { fail "Event0 status for uuload event in core B (timeout)" }
+}
+
+send_gdb "show perf-event1\n"
+gdb_expect {
+    -re ".*counter1 for \"uustore\" event is 1\[^\n\]+.*$octeon_core1_prompt $"  {
+	pass "Event1 status for uustore event in core B"
+    }
+    -re ".*$gdb_prompt $" {
+	fail "Event1 status for uustore event in core B"
+    }
+    timeout { fail "Event1 status for uustore event in core B (timeout)" }
+}

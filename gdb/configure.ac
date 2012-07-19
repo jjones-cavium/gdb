@@ -2349,6 +2349,13 @@ dnl  At the moment, we just assume it's UTF-8.
 AC_DEFINE(GDB_DEFAULT_HOST_CHARSET, "UTF-8",
           [Define to be a string naming the default host character set.])
 
+dnl Include the core number in the default prompt.
+case "${target}" in
+   mipsisa64*-octeon-elf* )
+	AC_DEFINE_UNQUOTED([DEFAULT_PROMPT], "(Core\0430-gdb) ",
+	  [Define to be the default GDB prompt.]) ;;
+esac
+
 AC_OUTPUT(Makefile gdb-gdb.gdb doc/Makefile data-directory/Makefile,
 [
 case x$CONFIG_HEADERS in

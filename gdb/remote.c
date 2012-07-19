@@ -4973,7 +4973,9 @@ remote_interrupt (int signo)
 {
   /* If this doesn't work, try more severe steps.  */
   signal (signo, remote_interrupt_twice);
-
+  /* This handler is not always set up so let the user know if the
+     ctrl-c was intercepted.  */
+  fprintf_unfiltered (gdb_stderr, "Interrupting");
   gdb_call_async_signal_handler (sigint_remote_token, 1);
 }
 

@@ -1,0 +1,106 @@
+# Copyright 2007 Cavium Networks, Inc.
+#
+# Test debugging the kernel.  We assume that the variable KERNEL
+# points to the kernel.
+ 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  
+
+if {![info exists KERNEL]} {
+    verbose "Skipping gdb.octeon/kernel.exp: KERNEL not set"
+    return
+}
+
+# Currently we support debugging the kernel through the exec debugger
+# with all communication methods (serial, sim and pci) and through the
+# linux debugger with serial.
+if {!([istarget "mipsisa64*-octeon-elf*"]
+      || ([istarget "mips64*-octeon-linux*"]
+	  && [string match "octeon-elf-serial" [target_info name]]))} {
+    verbose "Skipping gdb.octeon/kernel.exp"
+    return
+}
+
+verbose "Testing with kernel $KERNEL in gdb.octeon/kernel.exp"
+
+gdb_exit
+gdb_start
+
+# Find things relative to the kernel.
+set kerneldir [file dirname [file dirname $KERNEL]]
+set envfile "$kerneldir/u-boot-env"
+set rootfs "[file dirname $kerneldir]/embedded_rootfs/rootfs.ext2"
+
+# Adjust simulator for booting the kernel.
+set OCTEON_SIM_ARGS "-envfile=$envfile -ld0x40000000:$rootfs -quiet -noperf"
+
+# Adjust serial and PCI for booting the kernel.    
+set OCTEON_BOOTCMD "bootoctlinux"
+
+set saved_load_addr [target_info octeon_load_addr]
+unset_currtarget_info octeon_load_addr
+set_currtarget_info octeon_load_addr 0x21000000
+
+# Pass arguments when debugging kernel built for KGDB
+if {[info exists KGDB]} {
+   set OCTEON_BOOTCMD_ARGS "kgdbwait kgdboc=ttyS1,38400"
+}
+
+set loaded [gdb_load $KERNEL]
+
+if {$loaded == 0} {
+    pass "target command"
+}
+
+gdb_test "break r4k_wait" \
+    "Breakpoint.*at.* file .*, line.*" \
+    "breakpoint on r4k_wait"
+
+set saved $timeout
+set timeout 120
+gdb_test "continue" \
+    "Continuing\\..*Breakpoint \[0-9\]+, r4k_wait .* at .*:.*" \
+    "breakpoint hit 1"
+set timeout $saved
+
+gdb_test "continue" \
+    "Continuing\\..*Breakpoint \[0-9\]+, r4k_wait .* at .*:.*" \
+    "breakpoint hit 2"
+gdb_test "continue" \
+    "Continuing\\..*Breakpoint \[0-9\]+, r4k_wait .* at .*:.*" \
+    "breakpoint hit 3"
+
+# Disable the breakpoint and test if Ctrl-C breaks in
+gdb_test "disable 1" "" 
+
+send_gdb "continue\n"
+gdb_expect {
+    "Continuing" { pass "continue" }
+    timeout { fail "continue (timeout)" }
+}
+
+send_ctrl_c
+gdb_expect {
+   # Some frame should be printed.
+   -re " at .*$gdb_prompt $" { pass "Ctrl-C breaks in" }
+   -re " in .*$gdb_prompt $" { pass "Ctrl-C breaks in" }
+   timeout { fail "Ctrl-C breaks in (timed out)" }
+}
+
+set timeout $saved
+	    
+unset_currtarget_info octeon_load_addr
+if [info exists saved_load_addr] {
+    set_currtarget_info octeon_load_addr $saved_load_addr
+}

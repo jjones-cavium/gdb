@@ -1,4 +1,104 @@
 2012-07-18  Andrew Pinski  <apinski@cavium.com>
+            Chandrakala Chavva  <cchavva@caviumnetworks.com>
+            Adam Nemet  <anemet@caviumnetworks.com>
+
+	* Makefile.in (ALLDEPFILES): Add remote-octeon.c and remote-run.c.
+	* breakpoint.c (remove_breakpoint_1): Call target_remove_mc_hw_breakpoint instead of
+	target_remove_hw_breakpoint.
+	(breakpoint_thread_match): If the core numbers don't match the current core number
+	skip it.
+	(print_one_breakpoint_location): Print the core number also.
+	(init_raw_breakpoint_without_location): Initialize core_number and momentary.
+	(hw_breakpoint_used_count): Return hardware breakpoint count per core.
+	(set_momentary_breakpoint): Set the core_number of the breakpoint.
+	(insert_watchpoint): Call target_insert_mc_watchpoint instead of
+	target_insert_watchpoint.
+	(remove_watchpoint): Call target_remove_mc_watchpoint instead of
+	target_remove_watchpoint.
+	(breakpoint_hit_watchpoint): Return 0 if the core number does not match
+	the current core.
+	(watch_command_1): Initialize core_number.
+	(bkpt_insert_location): Call target_insert_mc_hw_breakpoint instead of
+	target_insert_hw_breakpoint.
+	(bkpt_remove_location): Call target_remove_mc_hw_breakpoint instead of
+	target_remove_hw_breakpoint.
+	* breakpoint.h (struct bp_location): New fields core_number and momentary.
+	* config.in: Regenerate.
+	* configure: Likewise.
+	* configure.ac: Define DEFAULT_PROMPT to "(Core#0-gdb) " for
+	Octeon Simple-exec.
+	* configure.tgt (mips*-*-linux*): Add emote-octeon.o remote-run.o.
+	(mipsisa64-octeon-elf*): New target.
+	* defs.h (setup_generic_remote_run): New prototype.
+	(generic_remote_can_run_target): Likewise.
+	(generic_remote_create_inferior): Likewise.
+	(never_print_frame): Declare variable.
+	* doc/gdbint.texinfo: Added documentation about new functions.
+	* dwarf2-frame.c (decode_frame_entry_1): Fix the target address size.
+	* infrun.c (never_print_frame): New variable.
+	(start_remote): Use it.
+	(execution_control_state): Add core_number field.
+	(handle_inferior_event): Take an old_core_number argument.
+	If we are thread hoping and the core numbers have changed, set
+	the core number too.
+	(infrun_thread_stop_requested_callback): Update call to
+	handle_inferior_event.
+	(prepare_for_detach): Set core_number after call to target_wait.
+	Update call to handle_inferior_event.
+	(wait_for_inferior): Likewise.
+	(fetch_inferior_event): Likewise.
+	* mips-tdep.c: Include dwarf2-frame.h.
+	(mips_octeon_reg_names): Names of Octeon registers.
+	(mips32_scan_prologue): Check for frame type only for valid frames.
+	(octeon_exception_frame_cache): New function to
+	initialize frame cache information.
+	(octeon_exception_frame_prev_register): New function to unwind
+	the registers of exception handler frame.
+	(octeon_exception_frame_this_id): New function to find the 
+	id of exception handler frame.
+	(octeon_exception_frame_prev_register): New function to unwind
+	the registers of exception handler frame.
+	(octeon_exception_frame_sniffer): New sniffer to unwind
+	exception handler.
+	(octeon_exception_frame_unwind): New.
+	(mips_breakpoint_from_pc): Define octeon_big_breakpoint to
+	insert breakpoints.
+	(mips_skip_trampoline_code): Return the address of
+	cvmx_interrupt_do_irq() to skip the exception handler routine.
+	(octeon_in_solib_return_trampoline): New, return 1 to skip
+	exception handler.
+	(mips_gdbarch_init): Initialize octeon_in_solib_return_trampoline.
+	Call octeon_exception_frame_sniffer.
+	Add octeon dwarf2 sniffer.
+	Initialize register names, baud_rate and remote
+	timeout for Octeon.
+
+
+	* target.h (to_insert_mc_hw_breakpoint): New.
+	(to_remove_mc_hw_breakpoint): Ditto.
+	(to_multicore_hw_breakpoint): Ditto.
+	(to_get_core_number): Ditto.
+	(target_multicore_hw_breakpoint): New macro.
+	(target_get_core_number): Ditto.
+	(target_insert_mc_hw_breakpoint): Ditto.
+	(target_remove_mc_hw_breakpoint): Ditto.
+	target_ops): Add to_set_core_number argument.
+	(target_set_core_number): New macro.
+	* target.c (debug_to_insert_mc_hw_breakpoint): New function.
+	(debug_to_remove_mc_hw_breakpoint): Ditto.
+	(debug_to_multicore_hw_breakpoint): Ditto.
+	(debug_to_get_core_number): Ditto.
+	(update_current_target): Added to_insert_mc_hw_breakpoint,
+	to_remove_mc_hw_breakpoint, to_multicore_hw_breakpoint and
+	to_get_core_number.  Add to_set_core_number.
+	(setup_target_debug): Ditto.
+	(debug_to_set_core_number): New function.
+	(setup_target_debug): Set to_set_core_number.
+	
+
+
+
+2012-07-18  Andrew Pinski  <apinski@cavium.com>
 
         * ser-tcp.c (net_open): Work around static NSS not working
         for looking up localhost by using 127.0.0.1 as localhost.

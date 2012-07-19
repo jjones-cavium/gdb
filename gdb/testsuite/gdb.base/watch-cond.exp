@@ -21,6 +21,10 @@ set testfile "watch-cond"
 set srcfile ${testfile}.c
 set binfile ${objdir}/${subdir}/${testfile}
 
+# Set the timeout to something larger for the simulator to finish
+set saved $timeout
+set timeout 240
+
 if { [prepare_for_testing ${testfile}.exp ${testfile} ${srcfile}] } {
     untested ${testfile}.exp
     return -1
@@ -53,6 +57,7 @@ if [target_info exists gdb,no_hardware_watchpoints] {
 
 if ![runto_main] then {
     fail "Can't run to main"
+    set timeout $saved
     return
 }
 
@@ -73,6 +78,7 @@ if [target_info exists gdb,no_hardware_watchpoints] {
 
 if ![runto_main] then {
     fail "Can't run to main"
+    set timeout $saved
     return
 }
 
@@ -90,3 +96,5 @@ gdb_test_no_output "condition 2 *foo > 10" \
 gdb_test "continue" \
     ".*condition cannot be tested in the current scope.*Old value = 1.*New value = 2.*" \
     "watchpoint stops with untestable local expression"
+
+set timeout $saved

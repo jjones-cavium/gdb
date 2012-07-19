@@ -49,6 +49,7 @@
 #include "frame-unwind.h"
 #include "frame-base.h"
 #include "trad-frame.h"
+#include "dwarf2-frame.h"
 #include "infcall.h"
 #include "floatformat.h"
 #include "remote.h"
@@ -543,6 +544,18 @@ static const char *mips_linux_reg_names[NUM_MIPS_PROCESSOR_REGS] = {
   "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23",
   "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31",
   "fsr", "fir"
+};
+
+/* Names of Octeon registers.  */
+static const char *mips_octeon_reg_names[NUM_MIPS_PROCESSOR_REGS] = {
+  "status", "lo", "hi", "badvaddr", "cause", "pc",
+  "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "",
+  "", "", "", "",
+  "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", ""
 };
 
 
@@ -3409,6 +3422,14 @@ restart:
   if (load_immediate_bytes && !seen_sp_adjust)
     end_prologue_addr -= load_immediate_bytes;
 
+  /* If we think this is a frameless function calling a function, give
+     up.  Most notably this is the case with libc's thread_start
+     routine which we never return from.  */
+  if (!seen_sp_adjust 
+      && this_frame 
+      && get_frame_type (this_frame) == NORMAL_FRAME)
+    this_cache->base = 0;
+
   return end_prologue_addr;
 }
 
@@ -3521,6 +3542,91 @@ mips_insn32_frame_base_sniffer (struct frame_info *this_frame)
   else
     return NULL;
 }
+
+static struct mips_frame_cache *
+octeon_exception_frame_cache (struct frame_info *this_frame, void **this_cache)
+{
+  struct mips_frame_cache *cache;
+  int reg;
+  gdb_byte buf[8];
+  int num_regs;
+  struct gdbarch *gdbarch = get_frame_arch (this_frame);
+
+  if ((*this_cache) != NULL)
+    return (*this_cache);
+
+  cache = trad_frame_cache_zalloc (this_frame);
+  (*this_cache) = cache;
+  cache->saved_regs = trad_frame_alloc_saved_regs (this_frame);
+
+  num_regs = gdbarch_num_regs (gdbarch);
+  /* Get the next frame's sp.  */
+  cache->base = get_frame_register_signed (this_frame, MIPS_SP_REGNUM + num_regs);
+  
+  for (reg = 1; reg < 32; reg++)
+    set_reg_offset (gdbarch, *this_cache, reg + num_regs, cache->base + (8 * reg));
+   
+  /* DEPC is saved as the 35. register.  */
+  set_reg_offset (gdbarch, *this_cache, MIPS_EMBED_PC_REGNUM + num_regs, 
+		  cache->base + (8 * 35)); 
+
+  return (*this_cache);
+}
+
+static void
+octeon_exception_frame_this_id (struct frame_info *this_frame, 
+				void **this_cache,
+				struct frame_id *this_id)
+{
+  struct mips_frame_cache *info = octeon_exception_frame_cache (this_frame,
+								this_cache);
+  /* This marks the outermost frame.  */
+  if (info->base == 0)
+    return;
+
+  (*this_id) = frame_id_build (info->base, get_frame_func (this_frame));
+}
+
+static struct value *
+octeon_exception_frame_prev_register (struct frame_info *this_frame,
+				 void **this_cache, int regnum)
+{
+  struct mips_frame_cache *info = octeon_exception_frame_cache (this_frame,
+								this_cache);
+  return trad_frame_get_prev_register (this_frame, info->saved_regs, regnum);
+}
+
+/* Unwind the frame in the exception handler. The debug information is not
+   present and the registers are stored in different offsets. */
+
+static int
+octeon_exception_frame_sniffer (const struct frame_unwind *self,
+				struct frame_info *this_frame, void **this_cache)
+{
+  gdb_byte buf[MIPS_INSN32_SIZE];
+  struct gdbarch *gdbarch = get_frame_arch (this_frame);
+  CORE_ADDR pc = get_frame_pc (this_frame);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+
+  /* Look for "jalr k0" */
+  if (target_read_memory (pc - 2*MIPS_INSN32_SIZE, buf, MIPS_INSN32_SIZE))
+    return 0;
+
+  if (extract_unsigned_integer (buf, MIPS_INSN32_SIZE, byte_order) == 0x0340f809)
+    return 1;
+
+  return 0;
+}
+
+static const struct frame_unwind octeon_exception_frame_unwind =
+{
+  NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
+  octeon_exception_frame_this_id,
+  octeon_exception_frame_prev_register,
+  NULL,
+  octeon_exception_frame_sniffer
+};
 
 static struct trad_frame_cache *
 mips_stub_frame_cache (struct frame_info *this_frame, void **this_cache)
@@ -6909,6 +7015,8 @@ mips_breakpoint_from_pc (struct gdbarch *gdbarch,
 	  static gdb_byte big_breakpoint[] = { 0, 0x5, 0, 0xd };
 	  static gdb_byte pmon_big_breakpoint[] = { 0, 0, 0, 0xd };
 	  static gdb_byte idt_big_breakpoint[] = { 0, 0, 0x0a, 0xd };
+	  /* Use SDBBP as breakpoint instruction for Octeon.  */
+	  static gdb_byte octeon_big_breakpoint[] = { 0x70, 0, 0xff, 0xff };
 	  /* Likewise, IRIX appears to expect a different breakpoint,
 	     although this is not apparent until you try to use pthreads.  */
 	  static gdb_byte irix_big_breakpoint[] = { 0, 0, 0, 0xd };
@@ -6917,6 +7025,9 @@ mips_breakpoint_from_pc (struct gdbarch *gdbarch,
 
 	  if (strcmp (target_shortname, "mips") == 0)
 	    return idt_big_breakpoint;
+	  else if (strcmp (target_shortname, "octeon") == 0
+	  	   || strcmp (target_shortname, "octeonpci") == 0)
+	    return octeon_big_breakpoint;
 	  else if (strcmp (target_shortname, "ddb") == 0
 		   || strcmp (target_shortname, "pmon") == 0
 		   || strcmp (target_shortname, "lsi") == 0)
@@ -7653,6 +7764,18 @@ mips_in_return_stub (struct gdbarch *gdbarch, CORE_ADDR pc, const char *name)
   return 0;			/* Not a stub.  */
 }
 
+/* On Octeon abuse the solib hooks to skip to the exception handler from
+   which we can unwind correctly.  */
+
+static int
+octeon_in_solib_return_trampoline (struct gdbarch *gdbarch, CORE_ADDR pc, char *name)
+{
+  if (name == NULL && pc == 0xffffffff80001180)
+    return 1;
+  
+  return 0;
+}
+
 /* If the current PC is the start of a non-PIC-to-PIC stub, return the
    PC of the stub target.  The stub just loads $t9 and jumps to it,
    so that $t9 has the correct value at function entry.  */
@@ -7720,6 +7843,20 @@ mips_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
   do
     {
       target_pc = pc;
+
+      /* We can only unwind from the exception handler after the stage2 frame.  
+         When hitting the exception vector skip to cvmx_interrupt_do_irq() which 
+         is called from stage2.  Abuse the solib hooks to implement this.  Note 
+         that cvmx_interrupt_do_irq is only available in CVMX apps. */
+      if (is_octeon (gdbarch, NULL) && pc == 0xffffffff80001180ull)
+	{
+	  struct minimal_symbol *msymbol;
+
+	  msymbol = lookup_minimal_symbol ("cvmx_interrupt_do_irq", NULL, 
+					    symfile_objfile);
+	  if (msymbol != NULL)
+	    pc = SYMBOL_VALUE_ADDRESS (msymbol);
+	}
 
       new_pc = mips_skip_mips16_trampoline_code (frame, pc);
       if (new_pc)
@@ -8003,6 +8140,16 @@ mips_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
       if (info.bfd_arch_info != NULL
           && info.bfd_arch_info->mach == bfd_mach_mips3900)
         reg_names = mips_tx39_reg_names;
+      else if (info.bfd_arch_info != NULL && is_octeon (gdbarch, info.bfd_arch_info))
+	{
+	  reg_names = mips_octeon_reg_names;
+	  /* Increase the timeout to wait for the simulator to be spawned
+	     to communicate with the debug stub.  */
+	  remote_timeout = 100;
+	  /* Change the default baud rate (-1) to transmit packets over 
+	     serial port. */
+	  baud_rate = 115200;
+	}
       else
         reg_names = mips_generic_reg_names;
     }
@@ -8662,6 +8809,16 @@ mips_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 
   /* Unwind the frame.  */
   dwarf2_append_unwinders (gdbarch);
+  if (is_octeon (gdbarch, info.bfd_arch_info))
+    {
+      /* On Octeon we are abusing the solib hooks to skip to the exception 
+	 frame from which we can unwind correctly.  */
+      set_gdbarch_in_solib_return_trampoline
+	(gdbarch, octeon_in_solib_return_trampoline);
+      /* Add Octeon specific unwinder to unwind through simple-exec's
+	 exception frame.  */
+      frame_unwind_append_unwinder (gdbarch, &octeon_exception_frame_unwind);
+    }
   frame_unwind_append_unwinder (gdbarch, &mips_stub_frame_unwind);
   frame_unwind_append_unwinder (gdbarch, &mips_insn16_frame_unwind);
   frame_unwind_append_unwinder (gdbarch, &mips_micro_frame_unwind);
