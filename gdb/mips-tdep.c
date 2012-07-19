@@ -7834,7 +7834,28 @@ mips_skip_pic_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
 }
 
 static CORE_ADDR
-mips_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
+octeon_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
+{
+  struct gdbarch *gdbarch = get_frame_arch (frame);
+
+  /* We can only unwind from the exception handler after the stage2 frame.  
+     When hitting the exception vector skip to cvmx_interrupt_do_irq() which 
+     is called from stage2.  Note that cvmx_interrupt_do_irq is only
+     available in CVMX apps. */
+  if (is_octeon (gdbarch, NULL) && pc == 0xffffffff80001180ull)
+    {
+      struct minimal_symbol *msymbol;
+
+      msymbol = lookup_minimal_symbol ("cvmx_interrupt_do_irq", NULL, 
+				       symfile_objfile);
+      if (msymbol != NULL)
+	return SYMBOL_VALUE_ADDRESS (msymbol);
+    }
+  return 0;
+}
+
+static CORE_ADDR
+octeon_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
 {
   CORE_ADDR requested_pc = pc;
   CORE_ADDR target_pc;
@@ -7844,18 +7865,12 @@ mips_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
     {
       target_pc = pc;
 
-      /* We can only unwind from the exception handler after the stage2 frame.  
-         When hitting the exception vector skip to cvmx_interrupt_do_irq() which 
-         is called from stage2.  Abuse the solib hooks to implement this.  Note 
-         that cvmx_interrupt_do_irq is only available in CVMX apps. */
-      if (is_octeon (gdbarch, NULL) && pc == 0xffffffff80001180ull)
+      new_pc = octeon_skip_trampoline_code (frame, pc);
+      if (new_pc)
 	{
-	  struct minimal_symbol *msymbol;
-
-	  msymbol = lookup_minimal_symbol ("cvmx_interrupt_do_irq", NULL, 
-					    symfile_objfile);
-	  if (msymbol != NULL)
-	    pc = SYMBOL_VALUE_ADDRESS (msymbol);
+	  pc = new_pc;
+	  if (is_compact_addr (pc))
+	    pc = unmake_compact_addr (pc);
 	}
 
       new_pc = mips_skip_mips16_trampoline_code (frame, pc);
