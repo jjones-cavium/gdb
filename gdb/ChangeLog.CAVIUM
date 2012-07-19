@@ -1,3 +1,9 @@
+2012-07-18  Andrew Pinski  <apinski@cavium.com>
+
+	* mips-tdep.c (mips_skip_trampoline_code): Move the octeon
+	simple-exec specific skipping code to ...
+	(octeon_skip_trampoline_code): this new function.
+
 2012-07-18  Chandrakala Chavva  <cchavva@caviumnetworks.com>
 
 	* mips-linux-tdep.c (mips_linux_init_abi): Added support to

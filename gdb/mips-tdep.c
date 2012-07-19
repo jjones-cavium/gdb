@@ -5662,9 +5662,9 @@ mips_skip_pic_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
 }
 
 static CORE_ADDR
-mips_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
+octeon_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
 {
-  CORE_ADDR target_pc;
+  struct gdbarch *gdbarch = get_frame_arch (frame);
 
   /* We can only unwind from the exception handler after the stage2 frame.  
      When hitting the exception vector skip to cvmx_interrupt_do_irq() which 
@@ -5681,6 +5681,17 @@ mips_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
       else 
 	return SYMBOL_VALUE_ADDRESS (msymbol);
     }
+  return 0;
+}
+
+static CORE_ADDR
+mips_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
+{
+  CORE_ADDR target_pc;
+
+  target_pc = octeon_skip_trampoline_code (frame, pc);
+  if (target_pc)
+    return target_pc;
 
   target_pc = mips_skip_mips16_trampoline_code (frame, pc);
   if (target_pc)
