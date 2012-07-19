@@ -1650,6 +1650,7 @@ ALLDEPFILES = \
 	procfs.c \
 	ravenscar-thread.c \
 	remote-m32r-sdi.c remote-mips.c \
+	remote-octeon.c remote-run.c \
 	remote-sim.c \
 	dcache.c \
 	rl78-tdep.c \

@@ -380,6 +380,10 @@ struct regcache *stop_registers;
 
 static int stop_print_frame;
 
+/* Set if normal_stop() should not print frame information.  */
+
+int never_print_frame;
+
 /* This is a cached copy of the pid/waitstatus of the last event
    returned by target_wait()/deprecated_target_wait_hook().  This
    information is returned by get_last_target_status().  */
@@ -2365,6 +2369,8 @@ start_remote (int from_tty)
      so that the displayed frame is up to date.  */
   post_create_inferior (&current_target, from_tty);
 
+  if (never_print_frame)
+    stop_print_frame = 0;
   normal_stop ();
 }
 
@@ -2415,6 +2421,7 @@ static enum infwait_states infwait_state;
 struct execution_control_state
 {
   ptid_t ptid;
+  int core_number;
   /* The thread that got the event, if this was a thread event; NULL
      otherwise.  */
   struct thread_info *event_thread;
@@ -2432,7 +2439,7 @@ struct execution_control_state
   int stepped_after_stopped_by_watchpoint;
 };
 
-static void handle_inferior_event (struct execution_control_state *ecs);
+static void handle_inferior_event (struct execution_control_state *ecs, int old_core_number);
 
 static void handle_step_into_function (struct gdbarch *gdbarch,
 				       struct execution_control_state *ecs);
@@ -2491,7 +2498,7 @@ infrun_thread_stop_requested_callback (struct thread_info *info, void *arg)
       ecs->ws.kind = TARGET_WAITKIND_STOPPED;
       ecs->ws.value.sig = GDB_SIGNAL_0;
 
-      handle_inferior_event (ecs);
+      handle_inferior_event (ecs, target_get_core_number ());
 
       if (!ecs->wait_some_more)
 	{
@@ -2680,6 +2687,7 @@ prepare_for_detach (void)
       struct cleanup *old_chain_2;
       struct execution_control_state ecss;
       struct execution_control_state *ecs;
+      int old_core_number = target_get_core_number ();
 
       ecs = &ecss;
       memset (ecs, 0, sizeof (*ecs));
@@ -2696,6 +2704,8 @@ prepare_for_detach (void)
       else
 	ecs->ptid = target_wait (pid_ptid, &ecs->ws, 0);
 
+      ecs->core_number = target_get_core_number ();
+
       if (debug_infrun)
 	print_target_wait_results (pid_ptid, ecs->ptid, &ecs->ws);
 
@@ -2706,7 +2716,7 @@ prepare_for_detach (void)
 				  &minus_one_ptid);
 
       /* Now figure out what to do with the result of the result.  */
-      handle_inferior_event (ecs);
+      handle_inferior_event (ecs, old_core_number);
 
       /* No error, don't finish the state yet.  */
       discard_cleanups (old_chain_2);
@@ -2748,6 +2758,7 @@ wait_for_inferior (void)
       struct execution_control_state ecss;
       struct execution_control_state *ecs = &ecss;
       struct cleanup *old_chain;
+      int old_core_number = target_get_core_number ();
 
       memset (ecs, 0, sizeof (*ecs));
 
@@ -2764,6 +2775,8 @@ wait_for_inferior (void)
       else
 	ecs->ptid = target_wait (waiton_ptid, &ecs->ws, 0);
 
+      ecs->core_number = target_get_core_number ();
+
       if (debug_infrun)
 	print_target_wait_results (waiton_ptid, ecs->ptid, &ecs->ws);
 
@@ -2773,7 +2786,7 @@ wait_for_inferior (void)
       old_chain = make_cleanup (finish_thread_state_cleanup, &minus_one_ptid);
 
       /* Now figure out what to do with the result of the result.  */
-      handle_inferior_event (ecs);
+      handle_inferior_event (ecs, old_core_number);
 
       /* No error, don't finish the state yet.  */
       discard_cleanups (old_chain);
@@ -2803,6 +2816,7 @@ fetch_inferior_event (void *client_data)
   struct cleanup *ts_old_chain;
   int was_sync = sync_execution;
   int cmd_done = 0;
+  int old_core_number = target_get_core_number ();
 
   memset (ecs, 0, sizeof (*ecs));
 
@@ -2839,6 +2853,8 @@ fetch_inferior_event (void *client_data)
   else
     ecs->ptid = target_wait (waiton_ptid, &ecs->ws, TARGET_WNOHANG);
 
+  ecs->core_number = target_get_core_number ();
+
   if (debug_infrun)
     print_target_wait_results (waiton_ptid, ecs->ptid, &ecs->ws);
 
@@ -2855,7 +2871,7 @@ fetch_inferior_event (void *client_data)
   make_bpstat_clear_actions_cleanup ();
 
   /* Now figure out what to do with the result of the result.  */
-  handle_inferior_event (ecs);
+  handle_inferior_event (ecs, old_core_number);
 
   if (!ecs->wait_some_more)
     {
@@ -3193,7 +3209,7 @@ get_inferior_stop_soon (ptid_t ptid)
    once).  */
 
 static void
-handle_inferior_event (struct execution_control_state *ecs)
+handle_inferior_event (struct execution_control_state *ecs, int old_core_number)
 {
   enum stop_kind stop_soon;
 
@@ -4052,6 +4068,9 @@ handle_signal_stop (struct execution_control_state *ecs)
 
 	  if (debug_infrun)
 	    fprintf_unfiltered (gdb_stdlog, "infrun: thread_hop_needed\n");
+
+	  if (ecs->core_number != old_core_number)
+	    target_set_core_number (old_core_number);
 
 	  /* Switch context before touching inferior memory, the
 	     previous thread may have exited.  */

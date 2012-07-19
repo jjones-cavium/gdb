@@ -1,0 +1,200 @@
+# Copyright 2007 Cavium Networks, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+#
+# Test hardware watchpoints in single core, also test enabling, disabling 
+# hardware watchpoints and re-run to hardware watchpoints. Also test rwatch 
+# and awatch.
+#
+if ![istarget "mipsisa64-octeon-*"] then {
+  return -1;
+}
+
+set testfile "wp-1"
+set srcfile ${testfile}.c
+set binfile ${testfile}.out
+
+# Compile the simple exec application under ${sourcedir}, copy the
+# executable (${execfile}) to destination directory (${destdir}).
+set binfile [ cvmx_compile $binfile $srcdir/$subdir $srcfile "" "-g" "" "" ]
+
+if { $binfile == "" } {
+  fail "compilation"
+  return;
+}
+
+pass "compilation"
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+set bp_location1 [gdb_get_line_number "set break here 1"]
+set bp_location2 [gdb_get_line_number "set break here 2"]
+
+gdb_test "tbreak ${srcfile}:${bp_location1}" \
+    "Temporary breakpoint.*at.* file .*${srcfile}, line.*" \
+    "breakpoint function"
+
+gdb_test "break ${srcfile}:${bp_location2}" \
+    "Breakpoint.* at.* file .*${srcfile}, line.*" \
+    "break at the end"
+
+gdb_run_cmd
+gdb_expect {
+     -re ".*${srcfile}:${bp_location1}.*$gdb_prompt $" {
+        pass "run to breakpoint"
+     }
+    -re ".*$gdb_prompt $" {
+        fail "run to breakpoint"
+    }
+    timeout { fail "run to breakpoint (timeout)" }
+}
+
+# apply watchpoint on global variable
+gdb_test "watch g1" \
+    "Hardware watchpoint 3: g1" \
+    "Global Hardware Watchpoint"
+
+# apply watchpoint on local variable
+gdb_test "watch l1" \
+    "Hardware watchpoint 4: l1" \
+    "Local Hardware Watchpoint" 
+
+gdb_test "continue" \
+     ".*Continuing\\..*Hardware watchpoint \[0-9\]+: l1.*
+Old value = 0.*
+New value = 2.*" \
+     "hit local hardware watchpoint"
+
+gdb_test "continue" \
+     ".*Continuing\\..*Hardware watchpoint \[0-9\]+: g1.*
+Old value = 0.*
+New value = 3.*" \
+     "hit global hardware watchpoint"
+
+# disable watchpoint on local variable
+gdb_test "disable 4"
+
+gdb_test "info break" \
+     "Num +Type +Disp Enb Address +What.*
+\[0-9\]+\[\t \]+breakpoint .*keep\[ \t]+y .*${srcfile}:${bp_location2}.*
+\[0-9\]+.*core \#0 hw watchpoint\[ \t\]+keep\[ \t\]+y\[ \t\]+g1.*
+\[0-9\]+.*core \#0 hw watchpoint\[ \t\]+keep\[ \t\]+n\[ \t\]+l1.*" \
+     "watchpoint info after disable"
+
+gdb_test "continue" \
+     ".*Continuing\\..*Hardware watchpoint \[0-9\]+: g1.*
+Old value = 3.*
+New value = 6.*" \
+     "disable stopped at hardware watchpoint on global variable"
+
+# enable watchpoint on local variable
+gdb_test "enable 4"
+
+gdb_test "info break" \
+     "Num +Type +Disp Enb Address +What.*
+\[0-9\]+\[\t \]+breakpoint .*keep\[ \t]+y .*${srcfile}:${bp_location2}.*
+\[0-9\]+.*core \#0 hw watchpoint\[ \t\]+keep\[ \t\]+y\[ \t\]+g1.*
+\[0-9\]+.*core \#0 hw watchpoint\[ \t\]+keep\[ \t\]+y\[ \t\]+l1.*" \
+     "breakpoint info after enable"
+
+gdb_test "continue" \
+     ".*Continuing\\..*Hardware watchpoint \[0-9\]+: l1.*
+Old value = 4.*
+New value = 6.*" \
+     "enabled stopped at hardware watchpoint on local variable"
+
+# apply watchpoints to check the limits.
+gdb_test "watch g2" \
+    "Hardware watchpoint 5: g2" \
+    "Hardware Watchpoint g2"
+
+gdb_test "watch g3" \
+    "Hardware watchpoint 6: g3" \
+    "Hardware Watchpoint g3"
+
+gdb_test "info break" \
+     "Num +Type +Disp Enb Address +What.*
+\[0-9\]+\[\t \]+breakpoint .*keep\[ \t]+y .*${srcfile}:${bp_location2}.*
+\[0-9\]+.*core \#0 hw watchpoint\[ \t\]+keep\[ \t\]+y\[ \t\]+g1.*
+\[0-9\]+.*core \#0 hw watchpoint\[ \t\]+keep\[ \t\]+y\[ \t\]+l1.*
+\[0-9\]+.*core \#0 hw watchpoint\[ \t\]+keep\[ \t\]+y\[ \t\]+g2.*
+\[0-9\]+.*core \#0 hw watchpoint\[ \t\]+keep\[ \t\]+y\[ \t\]+g3.*" \
+     "breakpoint info after continue"
+
+gdb_test "watch j" \
+     "Octeon supports only four hardware breakpoints\\/watchpoints.*
+Watchpoint 7: j.*" \
+     "hardware watchpoint exceeds limit"
+
+# Check for error message about "program has left the block in which
+# its expression is valid. 
+
+gdb_test "disable 3 5 6 7"
+gdb_test "continue" \
+    ".*Watchpoint .*deleted because the program has left the block in.*
+which its expression is valid.*" \
+    "watchpoint error message about leaving the block"
+
+gdb_test "enable 3"
+
+gdb_run_cmd 
+gdb_expect {
+     -re ".*Hardware watchpoint .*g1.*Old value = 0.*New value = 3.*$gdb_prompt $" {
+        pass "rerun to hardware breakpoint"
+     }
+    -re ".*$gdb_prompt $" {
+        fail "rerun to hardware breakpoint"
+    }
+    timeout { fail "rerun to hardware breakpoint (timeout)" }
+}
+
+
+# Test awatch
+
+# disable other watchpoints. 
+gdb_test "disable 3"
+
+gdb_test "awatch g1" \
+    "Hardware access \\(read\\/write\\) watchpoint \[0-9\]+: g1.*" \
+    "awatch watchpoint"
+
+gdb_test "continue" \
+    ".*Hardware access \\(read\\/write\\) watchpoint \[0-9\]+: g1.*
+Value = 3.*" \
+    "awatch load"
+
+gdb_test "continue" \
+    ".*Hardware access \\(read\\/write\\) watchpoint \[0-9\]+: g1.*
+Old value = 3.*
+New value = 6.*" \
+    "awatch store"
+
+# Test rwatch
+gdb_test "dis"
+gdb_test "break ${srcfile}:${bp_location2}"
+gdb_test "rwatch g2" \
+     "Hardware read watchpoint \[0-9\]+: g2" \
+     "rwatch watchpoint"
+
+gdb_test "continue" \
+    ".*Hardware read watchpoint \[0-9\]+: g2.*
+Value = 0.*" \
+    "stopped because of rwatch"
+
+gdb_test "continue" \
+    ".*break here 2.*" \
+    "stopped at break here"

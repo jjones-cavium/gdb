@@ -2465,6 +2465,13 @@ fi
 AC_SUBST(GCORE_TRANSFORM_NAME)
 AC_CONFIG_FILES([gcore], [chmod +x gcore])
 
+dnl Include the core number in the default prompt.
+case "${target}" in
+   mipsisa64*-octeon-elf* )
+	AC_DEFINE_UNQUOTED([DEFAULT_PROMPT], "(Core\0430-gdb) ",
+	  [Define to be the default GDB prompt.]) ;;
+esac
+
 AC_OUTPUT(Makefile gdb-gdb.gdb doc/Makefile data-directory/Makefile,
 [
 case x$CONFIG_HEADERS in

@@ -15322,6 +15322,15 @@ fi
 ac_config_files="$ac_config_files gcore"
 
 
+case "${target}" in
+   mipsisa64*-octeon-elf* )
+
+cat >>confdefs.h <<_ACEOF
+#define DEFAULT_PROMPT "(Core\0430-gdb) "
+_ACEOF
+ ;;
+esac
+
 ac_config_files="$ac_config_files Makefile gdb-gdb.gdb doc/Makefile data-directory/Makefile"
 
 ac_config_commands="$ac_config_commands default"

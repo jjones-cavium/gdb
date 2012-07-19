@@ -1,0 +1,93 @@
+# GDB has no default.exp under testsuite/config and it does not
+# delegate work to the protocol through remote.exp.  Instead
+# target-specific config files should be added here.
+#
+# This is the config file for GDB testing over the octeon target.
+
+# Given a program (if omitted use the one from the last invocation)
+# load it into GDB and connect to the target.  At this point one for
+# example should be able to set a breakpoint on main and a single
+# continue should hit this breakpoint.
+
+load_lib ../config/octeon-elf-gdb.exp
+
+proc gdb_load { arg } {
+    global gdb_prompt
+    global last_gdb_file
+    global KGDB
+    global OCTEON_ATTACH
+    global spawn_id
+
+    verbose "octeon-elf-serial-config.exp gdb_load: $arg\n"
+
+    if { $arg == "" } {
+	if [info exists last_gdb_file] {
+	    set arg $last_gdb_file;
+	    verbose "no file using default: $arg\n"
+	}
+    }
+    set last_gdb_file $arg;
+
+    gdb_file_cmd $arg
+
+    # Using single uart for debugging and loading the program does not 
+    # work.
+    set serial_boot [ board_info target serial ] 
+    set serial_gdb [board_info target octeon_serial_gdb]
+    if { "$serial_boot" == "$serial_gdb" } { 
+	perror "Cannot run debugger regressions when using single uart"
+	exit -1
+    } 
+
+    remote_open target
+    set uart [board_info target octeon_uart]
+    set debug ""
+    if {!$KGDB && ![info exists OCTEON_ATTACH]} {
+	set debug "debug=$uart"
+    }
+    set status [octeon_elf_load_and_boot target $arg $debug]
+    remote_close target
+
+    if { $status != 0 } { return $status }
+					
+    # ??? We sometimes fail to connect to the target here which
+    # manifests in that the target command hangs.  We might have a bug
+    # in our protocol such that we hang when gdb tries to connect to
+    # the stub too quickly after boot.
+    sleep 2
+
+    if {$KGDB} {
+	set target "remote"
+	# Set the baudrate
+	send_gdb "set remotebaud 38400\n"
+	gdb_expect 30 {
+	    -re ".*$gdb_prompt $" { }
+	    timeout {
+	    	warning "timeout while connecting to target"
+	    	return -1
+	    }
+	}
+    } else {
+	set target "octeon"
+    }
+    send_gdb "target $target $serial_gdb\n"
+    # Connecting to KGDB take longer time to connect, increase the timeout.
+    if ${KGDB} {
+       set tmp_timeout 120
+    } else {
+       set tmp_timeout 30
+    }
+    gdb_expect $tmp_timeout  {
+	-re ".*$gdb_prompt $" { }
+	timeout {
+	    warning "timeout while connecting to target"
+	    return -1
+	}
+    }
+
+    if [info exists spawn_id] {
+        unset spawn_id
+    }
+
+    return 0;
+}

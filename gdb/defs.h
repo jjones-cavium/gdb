@@ -735,6 +735,13 @@ extern int (*deprecated_ui_load_progress_hook) (const char *section,
 /* A width that can achieve a better legibility for GDB MI mode.  */
 #define GDB_MI_MSG_WIDTH  80
 
+/* From remote-run.c */
+extern void setup_generic_remote_run (char *, ptid_t);
+extern int generic_remote_can_run_target (char *);
+extern void generic_remote_create_inferior (struct target_ops *, char *, char *, char **, int);
+
+extern int never_print_frame;
+
 /* From progspace.c */
 
 extern void initialize_progspace (void);

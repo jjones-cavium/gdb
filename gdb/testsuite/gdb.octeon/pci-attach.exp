@@ -1,0 +1,129 @@
+# Copyright 2007 Cavium Networks, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  
+
+# In the PCI debugger we support attaching to an already running program.
+
+if {![string match "octeon-elf-pci*" [target_info name]]} {
+    return
+}
+
+set testfile "pci-attach"
+set srcfile ${testfile}.c
+set binfile ${objdir}/${subdir}/${testfile}
+
+if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable \
+       {debug nowarnings}] != "" } {
+     fail "compilation"
+     return
+}
+
+pass "compilation"
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+
+set OCTEON_ATTACH 1
+gdb_load $binfile
+
+# Make sure we're stopped.  Have two of these because the first can
+# match some old input before target octeonpci.
+
+set bootloader_id [remote_open target]
+remote_expect target 0 {
+    -re "iteration: .*" {}
+    timeout {}
+}
+remote_expect target 5 {
+    -re "iteration: .*" { fail "program stopped after attach" }
+    timeout { pass "program stopped after attach" }
+}
+
+send_gdb "continue\n"
+gdb_expect 10 {
+    "Continuing" { pass "continue" }
+    timeout { fail "continue (timeout)" }
+}
+
+# We should be running now.
+
+remote_expect target 10 {
+    -re "iteration: .*" { pass "program running after continue" }
+    timeout { fail "program running after continue (timeout)" }
+}
+					
+send_ctrl_c
+gdb_expect {
+    # Some frame should be printed.
+    -re " at .*$gdb_prompt $" { pass "ctrl-c" }
+    -re " in .*$gdb_prompt $" { pass "ctrl-c" }
+    timeout { fail "ctrl-c (timeout)" }
+}
+
+gdb_test "break ${srcfile}:16" "Breakpoint.*at.*" "breakpoint"
+gdb_test "continue" ".*Breakpoint 1.*main.*printf.*" "hit breakpoint"
+
+send_gdb "print i\n"
+gdb_expect {
+    -re " = \(\[0-9\]+\)" { pass "print i" }
+    timeout { fail "print i (timeout)" }
+}
+
+set iter $expect_out(1,string)
+verbose "trying to match iteration: $iter\\r"
+
+gdb_test "continue" ".*Breakpoint 1.*main.*printf.*" \
+    "hit breakpoint second time"
+remote_expect target 10 {
+    -re "iteration: $iter\r" { pass "match state with output" }
+    timeout { fail "match state with output (timeout)" }
+}
+
+# We should detach after exiting the GDB.
+
+gdb_exit
+remote_expect target 10 {
+    -re "iteration: .*" { pass "program running after detach 1" }
+    timeout { fail "program running after detach 1 (timeout)" }
+}
+remote_expect target 10 {
+    -re "iteration: .*" { pass "program running after detach 2" }
+    timeout { fail "program running after detach 2 (timeout)" }
+}
+
+# When booting with debug we don't get a chance to install the PCI
+# debug exception handler, die gracefully.
+
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_file_cmd $binfile
+
+set status [octeon_elf_load_and_boot target $binfile debug]
+if { $status != 0 } {
+    remote_close target
+    return $status
+}
+
+gdb_test "target octeonpci" ".*Remote target octeon connected to.*" \
+    "attach when booting with debug"
+
+gdb_test "help" "" "alive"
+
+remote_close target
+
+# Restore gdb as the default spawn_id (spawn sets it) so that commands
+# like match_max that work with the default don't try work an a close id.
+set spawn_id [board_info host fileid]

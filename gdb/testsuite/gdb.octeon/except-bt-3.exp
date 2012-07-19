@@ -1,0 +1,157 @@
+#   Copyright 2007 Cavium Networks, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+#
+# Test backtrace global, static variables in case of exception for
+# optimized testcase.
+#
+if ![istarget "mipsisa64-octeon-*"] then {
+  return -1;
+}
+
+# Test global, local and arguments at each frame on exception
+proc test_frame_variables { option } {
+    global gdb_prompt
+
+    gdb_test "backtrace" \
+        "#0.*cvmx_interrupt_do_irq.*
+#1.*cvmx_interrupt_stage2.*
+#2.*in func2 \\(x2=110\\).*
+#3.*in func1 \\(x1=.*
+#4.*in main.*" \
+        "backtrace from default exception handler ($option)"
+
+    # print the parameters of cvmx_interrupt_do_irq
+    gdb_test "print registers" \
+	    " = \\(uint64_t \\*\\).*" \
+	    "print registers ($option)"
+
+    # Go up 2 levels and print the frame information
+    gdb_test "up 2"  "#2.*in func2 ().*"  "up to func2 () ($option)"
+
+    # print all global, static and local variables from func2().
+    gdb_test "print y" " = 20" "print static local in func2() ($option)"
+    gdb_test "print local\[3\]" " = 113" "print local in func2() ($option)"
+    gdb_test "print global_data" " = 5" "print global from func2() ($option)"
+    gdb_test "print global_ro" " = 201" \
+	"print static global from func2() ($option)"
+    gdb_test "print global_arr\[0\]" " = 200" \
+	"print global array from func2 ($option)"
+    gdb_test "print x2" " = 110" "print arg0 from func2() ($option)"
+
+    # print all global, static and local variables from func1.
+    gdb_test "up" "#3.*in func1.*" "up to func1() ($option)"
+    gdb_test "print global_data" " = 5" "print global from func1() ($option)"
+    gdb_test "print global_arr\[2\]" " = 600" \
+	"print global array from func1 ($option)"
+    #gdb_test "print x1" " = 10" "print arg0 from func1() ($option)"
+
+    # print all global, static and local variables from main.
+    gdb_test "up" "#4.*in main.*" "up to main() ($option)"
+    gdb_test "print y" " = 10" "print local from main() ($option)"
+    gdb_test "print global_data" " = 5" "print global from main() ($option)"
+    gdb_test "print global_ro" " = 201" \
+	"print static global from main() ($option)"
+    gdb_test "print global_arr\[1\]" " = 410" \
+	"print global array from main ($option)"
+    
+    # print all global variables from cvmx_interrupt_stage2
+    gdb_test "down 3" \
+	"#1.*in cvmx_interrupt_stage2.*" \
+	 "in stage2 exception handler ($option)"
+
+    gdb_test "print global_data" " = 5" "print global from main() ($option)"
+    gdb_test "print global_ro" " = 201" "print static global from main() ($option)"
+    
+    gdb_test "info frame" \
+	"Stack level 1, .*cvmx_interrupt_stage2.*Saved registers.*" \
+	"frame information of cvmx_interrupt_stage2 ($option)"
+
+    gdb_test "info frame 2" \
+	"Stack frame at .*in func2.*" \
+	"frame information of func2 ($option)"
+
+    gdb_test "info frame 3" \
+	"Stack frame at .*in func1.*" \
+	"frame information of func1 ($option)"
+
+    gdb_test "info frame 4" \
+	"Stack frame at .*in main.*" \
+	"frame information of main ($option)"
+}
+
+proc runto_cvmx_interrupt_do_irq { option } {
+    global gdb_prompt
+
+    gdb_test "break cvmx_interrupt_do_irq" \
+        "Breakpoint.*at.*" \
+        "breakpoint function ($option)"
+
+    gdb_run_cmd 
+    gdb_expect {
+         -re ".*Breakpoint \[0-9\]+, .*cvmx_interrupt_do_irq.*$gdb_prompt $" {
+            pass "run to breakpoint ($option)"
+         }
+        -re ".*$gdb_prompt" {
+            fail "run to breakpoint ($option)"
+        }
+        timeout { fail "run to breakpoint (timeout) ($option)" }
+    }
+}
+
+set testfile "except-bt-3"
+set srcfile ${testfile}.c
+set binfile ${testfile}-O2.out
+
+# First build simple exec app with optimization
+set binfile [ cvmx_compile $binfile $srcdir/$subdir $srcfile "" \
+		  "-g -O2 -fvar-tracking" "" "" ]
+
+if { $binfile == "" } {
+  fail "compilation -O2"
+  return;
+}
+
+pass "compilation -O2"
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+runto_cvmx_interrupt_do_irq "O2"
+
+# Test backtrace, parms, global and local variables for each frame.
+test_frame_variables "O2"
+
+# Recompile without optimization
+set binfile ${testfile}.out
+set binfile [ cvmx_compile $binfile $srcdir/$subdir $srcfile "" "-g" "" "" ]
+
+if { $binfile == "" } {
+  fail "compilation"
+  return;
+}
+
+pass "compilation -O0"
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+runto_cvmx_interrupt_do_irq "O0"
+
+# Test backtrace, parms, global and local variables for each frame.
+test_frame_variables "00"

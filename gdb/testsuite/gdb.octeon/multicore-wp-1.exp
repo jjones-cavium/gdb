@@ -1,0 +1,168 @@
+# Copyright 2007 Cavium Networks, Inc.
+#
+# Test debugging the kernel.  We assume that the variable KERNEL
+# points to the kernel.
+ 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# Test multicore hardware watchpoints in 2 cores.
+#
+
+load_lib octeon.exp
+
+if ![istarget "mipsisa64-octeon-*"] then {
+  return -1;
+}
+
+set testfile "multicore-wp-1"
+set srcfile ${testfile}.c
+set binfile ${testfile}.out
+
+# build simple exec app
+set binfile [ cvmx_compile $binfile $srcdir/$subdir $srcfile "" "-g" "" "" ]
+
+if { $binfile == "" } {
+  fail "compilation"
+  return;
+}
+
+pass "compilation"
+
+gdb_exit
+gdb_start
+set OCTEON_NUMCORES 2
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+gdb_test "tbreak main"
+gdb_test "set step-all on"
+gdb_test "set active-cores"
+
+gdb_run_cmd
+gdb_expect {
+    -re ".*main.*$gdb_prompt $" {
+        set stopped_core 0
+        pass "run to breakpoint"
+     }
+    -re ".*$gdb_prompt" {
+        fail "run to breakpoint"
+    }
+    timeout { fail "run to breakpoint (timeout)" }
+}
+
+# apply watchpoint on global variable in core 0
+change_focus 0
+gdb_test "watch g0" \
+    "Hardware watchpoint 2: g0" \
+    "Hardware Watchpoint in core0"
+
+# apply watchpoint on global variable in core 1
+change_focus 1
+gdb_test "watch g1" \
+    "Hardware watchpoint 3: g1" \
+    "Hardware Watchpoint in core1"
+
+gdb_test "info break" \
+     "Num +Type +Disp Enb Address +What.*
+\[0-9\]+.*core \#0 hw watchpoint\[ \t\]+keep\[ \t\]+y\[ \t\]+g0.*
+\[0-9\]+.*core \#1 hw watchpoint\[ \t\]+keep\[ \t\]+y\[ \t\]+g1.*" \
+     "info break"
+
+gdb_test_multiple "continue" "Core hit first watchpoint" {
+     -re ".*g1.*Old value = 0.*New value = 3.*$octeon_core1_prompt $" {
+	pass "Core hit first watchpoint"
+     }
+     -re ".*g0.*Old value = 0.*New value = 9.*$octeon_core0_prompt $" {
+	pass "Core hit first watchpoint"
+     }
+     -re ".*$gdb_prompt $" {
+	fail "Core hit first watchpoint"
+     }
+     timeout { fail "Core hit first watchpoint (timeout)" }
+}
+    
+gdb_test_multiple "continue" "Core hit second watchpoint" {
+     -re ".*g1.*Old value = 0.*New value = 3.*$octeon_core1_prompt $" {
+	pass "Core hit second watchpoint"
+     }
+     -re ".*g0.*Old value = 0.*New value = 9.*$octeon_core0_prompt $" {
+	pass "Core hit second watchpoint"
+     }
+     -re ".*$gdb_prompt $" {
+	fail "Core hit second watchpoint"
+     }
+     timeout { fail "Core hit second watchpoint (timeout)" }
+}
+
+# disable watchpoint in first core
+gdb_test "disable 2"
+
+# Reset the value of g1.
+gdb_test "set focus 1"
+gdb_test "print g1=5"
+
+gdb_test_multiple "continue" "Core stopped in second core after disable" {
+     -re ".*g1.*Old value = .*New value = 8.*$octeon_core1_prompt $" {
+       # The debugger does not change the old value based on the above
+       # print command, so don't check for it. 
+	pass "Core stopped in second core after disable"
+     }
+     -re ".*g0.*$octeon_core0_prompt $" {
+	fail "Core stopped in second core after disable"
+     }
+     -re ".*$gdb_prompt $" {
+	fail "Core stopped in second core after disable"
+     }
+     timeout { fail "Core stopped in second core after disable (timeout)" }
+}
+
+# now enable watchpoint in first core and disable in second core
+gdb_test "enable 2"
+gdb_test "disable 3"
+
+# Reset the value of g0.
+gdb_test "set focus 0"
+gdb_test "print g0=7"
+
+gdb_test_multiple "continue" "Core stopped in first core after enable" {
+     -re ".*g0.*Old value = .*New value = 16.*$octeon_core0_prompt $" {
+        # The debugger does not change the old value based on the above
+        # print command, so don't check for it. 
+	pass "Core stopped in first core after enable"
+     }
+     -re ".*g1.*$octeon_core1_prompt $" {
+	fail "Core stopped in first core after enable"
+     }
+     -re ".*$gdb_prompt $" {
+	fail "Core stopped in first core after enable"
+     }
+     timeout { fail "Core stopped in second core after enable (timeout)" }
+}
+
+gdb_run_cmd 
+gdb_expect 60 {
+     -re ".*watchpoint .*g1.*New value = 3.*$octeon_core1_prompt $" {
+        pass "rerun to hardware watchpoint"
+     }
+     -re ".*watchpoint.*g0.*New value = 9.*$octeon_core0_prompt $" {
+        pass "rerun to hardware watchpoint"
+     }
+    -re ".*$gdb_prompt $" {
+        fail "rerun to hardware watchpoint"
+    }
+    timeout { fail "rerun to hardware watchpoint (timeout)" }
+}
+
+gdb_test "info break" \
+     "Num +Type +Disp Enb Address +What.*
+\[0-9\]+.*core \#0 hw watchpoint\[ \t\]+keep\[ \t\]+y\[ \t\]+g0.*
+\[0-9\]+.*core \#1 hw watchpoint\[ \t\]+keep\[ \t\]+n\[ \t\]+g1.*" \
+     "info break after rerun"

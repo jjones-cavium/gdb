@@ -1,0 +1,75 @@
+# Copyright 2008 Cavium Networks, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  
+
+
+# Test if we hit sdbbp at the end of the default exception handler.
+
+if {![istarget "*-octeon-elf*"]
+    || [string match "octeon-elf-sim*" [target_info name]]} {
+    return -1
+}
+
+set testfile except-bt-5
+set srcfile ${testfile}.c
+set binfile $testfile
+
+set binfile [cvmx_compile $binfile $srcdir/$subdir $srcfile "" "-g" "" ""]
+if { $binfile == "" } {
+  fail "Compilation"
+  return;
+}
+pass "Compilation"
+
+for {set attach 0} {$attach < 2} {incr attach} {
+    if {$attach} {
+	set with_attach " with attach"
+    } else {
+	set with_attach ""
+    }
+
+    gdb_exit
+    gdb_start
+    gdb_reinitialize_dir $srcdir/$subdir
+    if {$attach} {
+	set OCTEON_ATTACH 1
+    }
+
+    gdb_load ${binfile}
+    if {$attach} {
+	# With attach once we connect, we should already at the
+	# breakpont.
+    } else {
+	# We booted with debug, we need a continue here to hit the
+	# breakpoint.
+	send_gdb "continue\n"
+	gdb_expect {
+	    "Continuing\." { pass "Continue" }
+	    timeout { fail "Continue" }
+	}
+	sleep 1
+	send_ctrl_c
+	gdb_expect {
+	    -re "$gdb_prompt \$" { pass "Stopped on ctrl-c" }
+	    timeout { fail "Stopped on ctrl-c" }
+	}
+    }
+    gdb_test "bt" \
+	"__cvmx_interrupt_default_exception_handler.*" \
+	"Stopped in default exception handler$with_attach"
+    gdb_test "bt" \
+	"\#\[^\n\]* main \[^\n\]*$srcfile.*" \
+	"Backtrace reaches main$with_attach"
+}

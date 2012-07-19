@@ -1,0 +1,90 @@
+# GDB has no default.exp under testsuite/config and it does not
+# delegate work to the protocol through remote.exp.  Instead
+# target-specific config files should be added here.
+#
+# This is the config file for GDB testing over the octeonpci target.
+
+# ??? The PCI debugger requires root privileges.  Depending on the
+# version of sudo it can ignore entries in PATH and in turn will not
+# find oct-pci-reset when GDB tries to reset the board.  In this case
+# GDB testing should be done as root user.
+
+# Given a program (if omitted use the one from the last invocation)
+# load it into GDB and connect to the target.  At this point one for
+# example should be able to set a breakpoint on main and a single
+# continue should hit this breakpoint.
+
+load_lib ../config/octeon-elf-gdb.exp
+
+proc gdb_load { binfile } {
+    global gdb_prompt
+    global last_gdb_file
+    global OCTEON_ATTACH
+    global spawn_id
+
+    verbose "octeon-elf-pci-config.exp gdb_load: $binfile\n"
+
+    if { [exec whoami] != "root" } {
+	perror "Need to run as root"
+	exit 1
+    }
+
+    if { $binfile == "" } {
+	if [info exists last_gdb_file] {
+	    set binfile $last_gdb_file;
+	    verbose "no file using default: $binfile\n"
+	}
+    }
+    set last_gdb_file $binfile;
+
+    gdb_file_cmd $binfile
+
+    if [board_info target exists octeon_boot] {
+	send_gdb "set pci-bootcmd [board_info target octeon_boot]\n"
+	gdb_expect 30 {
+	  -re ".*$gdb_prompt $" { }
+	  timeout { return -1 }
+	}
+    }
+
+    set bootcmd "bootoct "
+    global OCTEON_BOOTCMD
+    if [info exists OCTEON_BOOTCMD] {
+	set bootcmd "$OCTEON_BOOTCMD "
+    }
+
+    # ??? Should be a global and it should be added to reset_octeon_vars.
+    append bootcmd [board_info target octeon_load_addr]
+
+    global OCTEON_NUMCORES
+    if [info exists OCTEON_NUMCORES] {
+        append bootcmd " numcores=$OCTEON_NUMCORES"
+    }
+
+    if [info exists OCTEON_ATTACH] {
+	verbose "booting as $bootcmd\n"
+	remote_open target
+	set status [octeon_elf_load_and_boot target $binfile]
+	remote_close target
+	if { $status != 0 } {
+	    return $status
+	}
+	verbose "attaching\n"
+	send_gdb "target octeonpci\n"
+    } else {
+	append bootcmd " debug"
+	verbose "booting as $bootcmd\n"
+	send_gdb "target octeonpci $bootcmd\n"
+    }
+
+    gdb_expect 30 {
+	-re "Remote target octeon connected to.*$gdb_prompt $" { }
+	timeout { return -1 }
+    }
+
+    if [info exists spawn_id] {
+        unset spawn_id
+    }
+    
+    return 0;
+}

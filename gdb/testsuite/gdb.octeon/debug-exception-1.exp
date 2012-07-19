@@ -1,0 +1,87 @@
+#   Copyright 2007 Cavium Networks, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+# Test the Debug-Mode Exception.
+
+if ![istarget "mipsisa64-octeon-*"] then {
+    return;
+}
+
+set testfile "debug-exception-1"
+set srcfile ${testfile}.c
+set binfile ${objdir}/${subdir}/${testfile}
+
+if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable \
+       {debug nowarnings}] != "" } {
+     gdb_suppress_entire_file "Testcase compile failed, so all tests in this \
+file will automatically fail."
+}
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+gdb_test "break foo" \
+    "Breakpoint.*at.* file .*$srcfile, line.*" \
+    "breakpoint at foo"
+
+gdb_run_cmd
+gdb_expect {
+    -re ".*Breakpoint .*$srcfile.*$gdb_prompt $" {
+        pass "run to breakpoint"
+     }
+    -re ".*$gdb_prompt $" {
+        fail "run to breakpoint"
+    }
+    timeout { fail "run to breakpoint (timeout)" }
+}
+
+gdb_test "next" \
+    ".*arrive here after next.*" \
+    "continuing after returning from debug-mode exception"
+
+# Test reading from invalid memory which causes Debug-Mode Exception.
+gdb_test_multiple "p *0x3fffffff8000340" "Reading invalid memory location" {
+    -re ".*Cannot access memory at address 0x3fffffff8000340.*$gdb_prompt $" {
+    	pass "Reading invalid memory location"
+    }
+    -re ".*Unable to convert virtual address to physical.*$gdb_prompt $" {
+	# The PCI debug stub returns different error message when reading 
+	# from an invalid memory location.
+	pass "Reading invalid memory location"
+    }
+    -re ".*$gdb_prompt $" {
+	fail "Reading invalid memory location"
+    }
+    timeout { fail "Reading invalid memory location (timeout)" }
+}
+
+# Test writing to invalid memory which causes Debug-Mode Exception.
+gdb_test_multiple "p *0x3fffffff8000342 = 10" "Write to invalid memory location" {
+    -re ".*Cannot access memory at address 0x3fffffff8000342.*$gdb_prompt $" {
+	pass "Write to invalid memory location"
+    }
+    -re ".*Unable to convert virtual address to physical.*$gdb_prompt $" {
+        # PCI debug stub returns different error message when writing to an
+	# invalid memory location.
+	pass "Write to invalid memory location"
+    }
+    -re ".*$gdb_prompt $" {
+	fail "Write to invalid memory location"
+    }
+    timeout { fail "Write to invalid memory location (timeout)" }
+}
