@@ -1,3 +1,8 @@
+2012-08-06  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elflink.c (bfd_elf_record_link_assignment): Remove --defsym
+	symbols special case.
+
 2012-01-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Fix zero registers core files when built by gcc-4.7.
