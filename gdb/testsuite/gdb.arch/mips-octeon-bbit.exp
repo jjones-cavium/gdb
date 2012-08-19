@@ -77,7 +77,7 @@ proc test_bbit { name taken } {
     }
 }
 
-set testfile "bbit"
+set testfile "mips-octeon-bbit"
 set srcfile ${testfile}.c
 set binfile ${objdir}/${subdir}/${testfile}
 
