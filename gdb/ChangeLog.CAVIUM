@@ -1,3 +1,7 @@
+2012-08-19  Andrew Pinski  <apinski@cavium.com>
+
+	* testsuite/gdb.arch/mips-octeon-bbit.exp (testfile): Fix assignment.
+
 2012-07-18  Andrew Pinski  <apinski@cavium.com>
 
 	* mips-tdep.c (mips_skip_trampoline_code): Move the octeon
