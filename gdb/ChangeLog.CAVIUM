@@ -1,3 +1,9 @@
+2012-08-24  Andrew Pinski  <apinski@cavium.com>
+
+	Bug #3548
+	* testsuite/gdb.octeon/debug-exception-1.exp: Fix n32 addresses as
+	those are only 32bits.
+
 2012-08-19  Andrew Pinski  <apinski@cavium.com>
 
 	* testsuite/gdb.arch/mips-octeon-bbit.exp (testfile): Fix assignment.
