@@ -56,7 +56,7 @@ gdb_test "next" \
 
 # Test reading from invalid memory which causes Debug-Mode Exception.
 gdb_test_multiple "p *0x3fffffff8000340" "Reading invalid memory location" {
-    -re ".*Cannot access memory at address 0x3fffffff8000340.*$gdb_prompt $" {
+    -re ".*Cannot access memory at address 0x\[0-9a-f\]+8000340.*$gdb_prompt $" {
     	pass "Reading invalid memory location"
     }
     -re ".*Unable to convert virtual address to physical.*$gdb_prompt $" {
@@ -72,7 +72,7 @@ gdb_test_multiple "p *0x3fffffff8000340" "Reading invalid memory location" {
 
 # Test writing to invalid memory which causes Debug-Mode Exception.
 gdb_test_multiple "p *0x3fffffff8000342 = 10" "Write to invalid memory location" {
-    -re ".*Cannot access memory at address 0x3fffffff8000342.*$gdb_prompt $" {
+    -re ".*Cannot access memory at address 0x\[0-9a-f\]+8000342.*$gdb_prompt $" {
 	pass "Write to invalid memory location"
     }
     -re ".*Unable to convert virtual address to physical.*$gdb_prompt $" {
