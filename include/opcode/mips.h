@@ -210,6 +210,10 @@
 #define	OP_OP_SDC2		0x3e
 #define	OP_OP_SDC3		0x3f	/* a.k.a. sd */
 
+/* MIPS VIRT ASE */
+#define OP_MASK_CODE10		0x3ff
+#define OP_SH_CODE10		11
+
 /* Values in the 'VSEL' field.  */
 #define MDMX_FMTSEL_IMM_QH	0x1d
 #define MDMX_FMTSEL_IMM_OB	0x1e
@@ -253,8 +257,6 @@
    of the operand handling in GAS.  The fields below only exist
    in the microMIPS encoding, so define each one to have an empty
    range.  */
-#define OP_MASK_CODE10		0
-#define OP_SH_CODE10		0
 #define OP_MASK_TRAP		0
 #define OP_SH_TRAP		0
 #define OP_MASK_OFFSET10	0
@@ -481,6 +483,9 @@ struct mips_opcode
    "~" 12 bit offset (OP_*_OFFSET12)
    "\" 3 bit position for aset and aclr (OP_*_3BITPOS)
 
+   VIRT ASE usage:
+   "+J" 10-bit hypcall code (OP_*CODE10)
+
    UDI immediates:
    "+1" UDI immediate bits 6-10
    "+2" UDI immediate bits 6-15
@@ -523,7 +528,7 @@ struct mips_opcode
    Extension character sequences used so far ("+" followed by the
    following), for quick reference when adding more:
    "1234"
-   "ABCDEFGHIPQSTXZ"
+   "ABCDEFGHIJPQSTXZ"
    "abcpstxz"
 */
 
@@ -713,12 +718,13 @@ static const unsigned int mips_isa_table[] =
   { 0x0001, 0x0003, 0x0607, 0x1e0f, 0x3e1f, 0x0a23, 0x3e63, 0x3ebf, 0x3fff };
 
 /* Masks used for Chip specific instructions.  */
-#define INSN_CHIP_MASK		  0xc3ff0f20
+#define INSN_CHIP_MASK		  0xc3ff0f60
 
 /* Cavium Networks Octeon instructions.  */
 #define INSN_OCTEON		  0x00000800
 #define INSN_OCTEONP		  0x00000200
 #define INSN_OCTEON2		  0x00000100
+#define INSN_OCTEON3		  0x00000040
 
 /* Masks used for MIPS-defined ASEs.  */
 #define INSN_ASE_MASK		  0x3c00f010
@@ -727,7 +733,8 @@ static const unsigned int mips_isa_table[] =
 #define INSN_DSP                  0x00001000
 #define INSN_DSP64                0x00002000
 
-/* 0x00004000 is unused.  */
+/* Virtualization ASE */
+#define INSN_VIRT		  0x00004000
 
 /* MIPS-3D ASE */
 #define INSN_MIPS3D               0x00008000
@@ -827,6 +834,7 @@ static const unsigned int mips_isa_table[] =
 #define CPU_OCTEON	6501
 #define CPU_OCTEONP	6601
 #define CPU_OCTEON2	6502
+#define CPU_OCTEON3	6503
 #define CPU_XLR     	887682   	/* decimal 'XLR'   */
 
 /* Test for membership in an ISA including chip specific ISAs.  INSN
@@ -867,6 +875,8 @@ static const unsigned int mips_isa_table[] =
 	 && ((insn)->membership & INSN_OCTEONP) != 0)			\
      || (cpu == CPU_OCTEON2						\
 	 && ((insn)->membership & INSN_OCTEON2) != 0)			\
+     || (cpu == CPU_OCTEON3						\
+	 && ((insn)->membership & INSN_OCTEON3) != 0)			\
      || (cpu == CPU_XLR && ((insn)->membership & INSN_XLR) != 0)        \
      || 0)	/* Please keep this term for easier source merging.  */
 
@@ -1646,7 +1656,7 @@ extern const int bfd_mips16_num_opcodes;
    "y" 5-bit source 3 register for ALNV.PS (MICROMIPSOP_*_RS3)
    "z" must be zero register
    "C" 23-bit coprocessor function code (MICROMIPSOP_*_COPZ)
-   "B" 8-bit syscall/wait function code (MICROMIPSOP_*_CODE10)
+   "B" 10-bit syscall/wait function code (MICROMIPSOP_*_CODE10)
    "K" 5-bit Hardware Register (RDHWR instruction) (MICROMIPSOP_*_RS)
 
    "+A" 5-bit INS/EXT/DINS/DEXT/DINSM/DEXTM position, which becomes
