@@ -1,3 +1,11 @@
+2012-08-29  Andrew Pinski  <apinski@cavium.com>
+
+	* archures.c (bfd_mach_mips_octeon3): New define.
+	* cpu-mips.c (I_mipsocteon3): New enum value.
+	(arch_info_struct): Add bfd_mach_mips_octeon3.
+	* elfxx-mips.c (mips_set_isa_flags): Handle bfd_mach_mips_octeon3.
+	(mips_mach_extensions): Add bfd_mach_mips_octeon3.
+
 2012-11-27  Andrew Pinski  <apinski@cavium.com>
 
 	* plugin.c (try_load_plugin): Add forgotten #endif.
