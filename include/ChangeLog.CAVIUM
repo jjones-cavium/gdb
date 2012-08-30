@@ -1,0 +1,11 @@
+2012-08-29  Andrew Pinski  <apinski@cavium.com>
+
+	* opcode/mips.h (OP_MASK_CODE10): Move to
+	VIRT ASE section and define to 0x3ff.
+	(OP_SH_CODE10): Move to VIRT ASE section and define to 11.
+	Mention "+J" is now used for the 10bit hypcall code.
+	(INSN_CHIP_MASK): Update.
+	(INSN_OCTEON3): New define.
+	(INSN_VIRT): New define.
+	(CPU_OCTEON3): Define.
+	(mips_isa_table): Handle CPU_OCTEON3.
