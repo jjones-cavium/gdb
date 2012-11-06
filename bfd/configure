@@ -659,6 +659,7 @@ WARN_CFLAGS
 REPORT_BUGS_TEXI
 REPORT_BUGS_TO
 PKGVERSION
+LTO_PLUGIN_SOURCE
 DEBUGDIR
 PLUGINS_FALSE
 PLUGINS_TRUE
@@ -789,6 +790,7 @@ enable_secureplt
 enable_leading_mingw64_underscores
 with_separate_debug_dir
 enable_elf_stt_common
+with_lto_plugin_source
 with_pkgversion
 with_bugurl
 enable_werror
@@ -1457,6 +1459,8 @@ Optional Packages:
   --with-separate-debug-dir=DIR
                           Look for global separate debug info in DIR
                           [default=LIBDIR/debug]
+  --with-lto-plugin-source=PATH
+                          Use the GCC LTO plugin source at PATH
   --with-pkgversion=PKG   Use PKG in the version string in place of "GNU
                           Binutils"
   --with-bugurl=URL       Direct users to URL to report a bug
@@ -11404,7 +11408,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 11407 "configure"
+#line 11411 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -11510,7 +11514,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 11513 "configure"
+#line 11517 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -12093,6 +12097,26 @@ if test $want_elf_stt_common = true; then
 $as_echo "#define USE_STT_COMMON 1" >>confdefs.h
 
 fi
+
+LTO_PLUGIN_SOURCE=.
+
+# Check whether --with-lto-plugin-source was given.
+if test "${with_lto_plugin_source+set}" = set; then :
+  withval=$with_lto_plugin_source; case "${withval}" in
+  yes) as_fn_error "Please supply a path to the GCC lto plugin source" "$LINENO" 5 ;;
+  /*)
+
+$as_echo "#define USE_LTO_PLUGIN_SOURCE 1" >>confdefs.h
+
+    LTO_PLUGIN_SOURCE=${withval}
+    ;;
+  no) ;;
+  *) as_fn_error "Please supply an absolute path to the GCC lto plugin source" "$LINENO" 5
+  ;;
+  esac
+fi
+
+
 
 
 

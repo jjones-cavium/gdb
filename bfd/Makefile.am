@@ -33,6 +33,7 @@ WARN_CFLAGS = @WARN_CFLAGS@
 NO_WERROR = @NO_WERROR@
 AM_CFLAGS = $(WARN_CFLAGS)
 AM_CPPFLAGS = -DBINDIR='"$(bindir)"'
+LTO_PLUGIN_SOURCE= @LTO_PLUGIN_SOURCE@
 if PLUGINS
 bfdinclude_HEADERS += $(INCDIR)/plugin-api.h
 LIBDL = -ldl
@@ -54,7 +55,8 @@ BFD32_LIBS = \
 	format.lo init.lo libbfd.lo opncls.lo reloc.lo \
 	section.lo syms.lo targets.lo hash.lo linker.lo \
 	srec.lo binary.lo tekhex.lo ihex.lo stabs.lo stab-syms.lo \
-	merge.lo dwarf2.lo simple.lo compress.lo verilog.lo
+	merge.lo dwarf2.lo simple.lo compress.lo verilog.lo \
+	gcc-lto-plugin.lo
 
 BFD64_LIBS = archive64.lo
 
@@ -64,7 +66,8 @@ BFD32_LIBS_CFILES = \
 	format.c init.c libbfd.c opncls.c reloc.c \
 	section.c syms.c targets.c hash.c linker.c \
 	srec.c binary.c tekhex.c ihex.c stabs.c stab-syms.c \
-	merge.c dwarf2.c simple.c compress.c verilog.c
+	merge.c dwarf2.c simple.c compress.c verilog.c \
+	gcc-lto-plugin.c
 
 BFD64_LIBS_CFILES = archive64.c
 
@@ -857,6 +860,18 @@ if AMDEP
 	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 endif
 	$(LTCOMPILE) -c -o $@ -DDEBUGDIR=\"$(DEBUGDIR)\" $(srcdir)/dwarf2.c
+endif
+
+gcc-lto-plugin.lo: gcc-lto-plugin.c Makefile
+if am__fastdepCC
+	$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ -I "$(LTO_PLUGIN_SOURCE)" $(srcdir)/gcc-lto-plugin.c
+	mv -f $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+else
+if AMDEP
+	source='gcc-lto-plugin.c' object='$@' libtool=yes @AMDEPBACKSLASH@
+	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+endif
+	$(LTCOMPILE) -c -o $@ -I "$(LTO_PLUGIN_SOURCE)" $(srcdir)/gcc-lto-plugin.c
 endif
 
 elf32-target.h : elfxx-target.h

@@ -109,6 +109,21 @@ if test $want_elf_stt_common = true; then
   AC_DEFINE(USE_STT_COMMON, 1,
     [Define if we may generate symbols with ELF's STT_COMMON type])
 fi
+
+LTO_PLUGIN_SOURCE=.
+AC_ARG_WITH(lto-plugin-source,
+  AS_HELP_STRING([--with-lto-plugin-source=PATH], [Use the GCC LTO plugin source at PATH]),
+[case "${withval}" in
+  yes) AC_MSG_ERROR([Please supply a path to the GCC lto plugin source]) ;;
+  /*)
+    AC_DEFINE(USE_LTO_PLUGIN_SOURCE, 1, [Define if we should compile in the source to the GCC LTO PLUGIN])
+    LTO_PLUGIN_SOURCE=${withval}
+    ;;
+  no) ;;
+  *) AC_MSG_ERROR([Please supply an absolute path to the GCC lto plugin source])
+  ;;
+  esac])
+AC_SUBST(LTO_PLUGIN_SOURCE)
 	 
 ACX_PKGVERSION([GNU Binutils])
 ACX_BUGURL([http://www.sourceware.org/bugzilla/])

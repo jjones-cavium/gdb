@@ -1,3 +1,19 @@
+2012-11-05  Andrew Pinski  <apinski@cavium.com>
+
+	Bug #5113
+	* Makefile.am (LTO_PLUGIN_SOURCE): New variable.
+	(BFD32_LIBS): Add gcc-lto-plugin.lo.
+	(BFD32_LIBS_CFILES): Add gcc-lto-plugin.c.
+	(gcc-lto-plugin.lo): New target.
+	* Makefile.in: Regenerate.
+	* config.in: Regenerate.
+	* configure: Regenerate.
+	* configure.in (--with-lto-plugin-source): New option.
+	* doc/Makefile.in: Regenerate.
+	* plugin.c (try_load_plugin): If pname contains "liblto_plugin"
+	use the builtin onload if USE_LTO_PLUGIN_SOURCE is define.
+	* gcc-lto-plugin.c: New file.
+
 2012-07-16  Andrew Pinski  <apinski@cavium.com>
 
 	* bfd/elf32-mips.c: Undef ELF_MINPAGESIZE before defining it.
