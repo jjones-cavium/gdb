@@ -125,7 +125,7 @@ am__objects_1 = archive.lo archures.lo bfd.lo bfdio.lo bfdwin.lo \
 	opncls.lo reloc.lo section.lo syms.lo targets.lo hash.lo \
 	linker.lo srec.lo binary.lo tekhex.lo ihex.lo stabs.lo \
 	stab-syms.lo merge.lo dwarf2.lo simple.lo compress.lo \
-	verilog.lo
+	verilog.lo gcc-lto-plugin.lo
 am_libbfd_la_OBJECTS = $(am__objects_1)
 libbfd_la_OBJECTS = $(am_libbfd_la_OBJECTS)
 libbfd_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
@@ -224,6 +224,7 @@ LIBTOOL = @LIBTOOL@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+LTO_PLUGIN_SOURCE = @LTO_PLUGIN_SOURCE@
 MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
@@ -373,7 +374,8 @@ BFD32_LIBS = \
 	format.lo init.lo libbfd.lo opncls.lo reloc.lo \
 	section.lo syms.lo targets.lo hash.lo linker.lo \
 	srec.lo binary.lo tekhex.lo ihex.lo stabs.lo stab-syms.lo \
-	merge.lo dwarf2.lo simple.lo compress.lo verilog.lo
+	merge.lo dwarf2.lo simple.lo compress.lo verilog.lo \
+	gcc-lto-plugin.lo
 
 BFD64_LIBS = archive64.lo
 BFD32_LIBS_CFILES = \
@@ -382,7 +384,8 @@ BFD32_LIBS_CFILES = \
 	format.c init.c libbfd.c opncls.c reloc.c \
 	section.c syms.c targets.c hash.c linker.c \
 	srec.c binary.c tekhex.c ihex.c stabs.c stab-syms.c \
-	merge.c dwarf2.c simple.c compress.c verilog.c
+	merge.c dwarf2.c simple.c compress.c verilog.c \
+	gcc-lto-plugin.c
 
 BFD64_LIBS_CFILES = archive64.c
 
@@ -1488,6 +1491,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/epoc-pe-arm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/epoc-pei-arm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/format.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gcc-lto-plugin.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hash.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hp300bsd.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hp300hpux.Plo@am__quote@
@@ -1978,6 +1982,13 @@ dwarf2.lo: dwarf2.c Makefile
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='dwarf2.c' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ -DDEBUGDIR=\"$(DEBUGDIR)\" $(srcdir)/dwarf2.c
+
+gcc-lto-plugin.lo: gcc-lto-plugin.c Makefile
+@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ -I "$(LTO_PLUGIN_SOURCE)" $(srcdir)/gcc-lto-plugin.c
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='gcc-lto-plugin.c' object='$@' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ -I "$(LTO_PLUGIN_SOURCE)" $(srcdir)/gcc-lto-plugin.c
 
 elf32-target.h : elfxx-target.h
 	rm -f elf32-target.h

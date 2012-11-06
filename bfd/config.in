@@ -319,6 +319,9 @@
 /* Use b modifier when opening binary files? */
 #undef USE_BINARY_FOPEN
 
+/* Define if we should compile in the source to the GCC LTO PLUGIN */
+#undef USE_LTO_PLUGIN_SOURCE
+
 /* Define if we should use leading underscore on 64 bit mingw targets */
 #undef USE_MINGW64_LEADING_UNDERSCORES
 
