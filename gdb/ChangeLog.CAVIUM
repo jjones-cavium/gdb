@@ -1,3 +1,10 @@
+2012-11-06  Praveen Jonnalagadda <Praveen.Jonnalagadda@caviumnetworks.com>
+
+	Bug #4616
+	* gdb/mips-tdep.c: Added support for core files in elf debugger
+	* gdb/mips-linux-tdep.h: Moved common defines to mips-tdep.h
+	* gdb/mips-tdep.h: Moved common defined from mips-linux-tdep.h
+
 2012-08-24  Andrew Pinski  <apinski@cavium.com>
 
 	Bug #3548
