@@ -1,3 +1,7 @@
+2012-11-27  Andrew Pinski  <apinski@cavium.com>
+
+	* plugin.c (try_load_plugin): Add forgotten #endif.
+
 2012-11-05  Andrew Pinski  <apinski@cavium.com>
 
 	Bug #5113

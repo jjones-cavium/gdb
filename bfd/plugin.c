@@ -153,6 +153,7 @@ try_load_plugin (const char *pname)
     goto err;
 #ifdef USE_LTO_PLUGIN_SOURCE
   }
+#endif
 
   i = 0;
   tv[i].tv_tag = LDPT_MESSAGE;
