@@ -1,3 +1,10 @@
+2012-11-28  Praveen Jonnalagadda <Praveen.Jonnalagadda@caviumnetworks.com>
+
+	Bug #5213
+	* gdb/remote-octeon.c: Call new function set_resumed_once ()
+	* gdb/remote-run.c: New function set_resumed_once ()
+	* gdb/target.c: Inherit to_open () to current_target 
+
 2012-11-06  Praveen Jonnalagadda <Praveen.Jonnalagadda@caviumnetworks.com>
 
 	Bug #4616

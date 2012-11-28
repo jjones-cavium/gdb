@@ -118,6 +118,12 @@ generic_remote_create_inferior (struct target_ops *target, char *execfile, char 
   init_wait_for_inferior ();
 }
 
+void 
+set_resumed_once ()
+{
+  resumed_once = 1;
+}
+
 /* Capture resume call to know whether we have started effectively
    debugging the program.  */
 
@@ -127,7 +133,7 @@ generic_remote_resume (struct target_ops *ops, ptid_t ptid, int step, enum targe
   if (remote_debug && !resumed_once)
     fprintf_unfiltered (gdb_stdlog, "generic_remote_resume: resumed once\n");
 
-  resumed_once = 1;
+  set_resumed_once ();
   remote_resume (ops, ptid, step, signal);
 }
 
