@@ -602,7 +602,7 @@ update_current_target (void)
       INHERIT (to_shortname, t);
       INHERIT (to_longname, t);
       INHERIT (to_doc, t);
-      /* Do not inherit to_open.  */
+      INHERIT (to_open, t);
       /* Do not inherit to_close.  */
       /* Do not inherit to_attach.  */
       INHERIT (to_post_attach, t);

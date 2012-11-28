@@ -49,6 +49,7 @@
 /* Define the target subroutine names. */
 struct target_ops octeon_ops, octeon_pci_ops;
 
+extern void set_resumed_once (void);
 /* Local function declarations */
 static void close_connection ();
 static void create_connection ();
@@ -1395,6 +1396,7 @@ octeon_resume (struct target_ops *ops, ptid_t ptid, int step, enum target_signal
     make_and_send_packet ("s");
   else
     make_and_send_packet ("c");
+  set_resumed_once ();
 }
 
 /* Fetch the remote registers. */
