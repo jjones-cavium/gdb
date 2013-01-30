@@ -24,6 +24,7 @@ if ![istarget "mipsisa64-octeon-*"] then {
 proc test_frame_variables { option } {
     global gdb_prompt
 
+    setup_xfail mipsisa64-octeon*-* bugzilla/1926
     gdb_test "backtrace" \
         "#0.*cvmx_interrupt_do_irq.*
 #1.*cvmx_interrupt_stage2.*
