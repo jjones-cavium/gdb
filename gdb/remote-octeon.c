@@ -1060,6 +1060,9 @@ octeon_open (char *name, int from_tty)
   s = lookup_symtab ("octeon-debug.c");
   if (s)
     s->language = language_unknown;
+  s = lookup_symtab ("cvmx-debug.c");
+  if (s)
+    s->language = language_unknown;
 }
 
 /* Open a connection to a remote debugger for the octeonpci target. It is called after target command.  */
