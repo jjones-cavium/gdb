@@ -1,3 +1,8 @@
+2013-03-31  Andrew Pinski  <apinski@cavium.com>
+
+	* remote-octeon.c (octeon_open): Also set the language of
+	cvmx-debug.c to unkown.
+
 2013-01-30  Andrew Pinski  <apinski@cavium.com>
 
 	Bug #1926
