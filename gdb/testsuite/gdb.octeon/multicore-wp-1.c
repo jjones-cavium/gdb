@@ -48,7 +48,7 @@ main (void)
     {
       /* Used to sync up the cores, otherwise the same core hits the hardware
 	 watchpoint again and again on continue commands.  */
-      cvmx_coremask_barrier_sync (sysinfo->core_mask);
+      cvmx_coremask_barrier_sync (&sysinfo->core_mask);
       /* Used to control the sequence of the program. There are chances of 
          hitting the hardware breakpoint by both the cores at the same time. */
       cvmx_spinlock_lock (&core_lock);
