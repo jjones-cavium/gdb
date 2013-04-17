@@ -1,3 +1,7 @@
+2013-04-17  Andrew Pinski  <apinski@cavium.com>
+
+	* testsuite/gdb.octeon/multicore-wp-1.c: Update for the coremarks changes.
+
 2013-03-31  Andrew Pinski  <apinski@cavium.com>
 
 	* remote-octeon.c (octeon_open): Also set the language of
