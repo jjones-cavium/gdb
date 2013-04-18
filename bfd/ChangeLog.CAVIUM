@@ -1,3 +1,9 @@
+2013-04-18  Andrew Pinski  <apinski@cavium.com>
+
+	Bug #6715
+	* elf64-aarch64.c (elf64_aarch64_finish_dynamic_sections): Change
+	reading and writing of instructions for PLTs to be always little-endian.
+
 2012-08-29  Andrew Pinski  <apinski@cavium.com>
 
 	* archures.c (bfd_mach_mips_octeon3): New define.
@@ -78,4 +84,6 @@
 	(ELF_MINPAGESIZE): Define to 4k.
 	* elfn32-mips.c (ELF_COMMONPAGESIZE): Define to 64k.
 	(ELF_MINPAGESIZE): Define to 4k.
+=======
+>>>>>>> 2470ada... 2013-04-18  Andrew Pinski  <apinski@cavium.com>
 
