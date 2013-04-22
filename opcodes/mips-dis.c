@@ -41,6 +41,13 @@
 /* Mips instructions are at maximum this many bytes long.  */
 #define INSNLEN 4
 
+/* Generate Octeon/MIPS unaligned load and store instructions. */
+#ifdef INCLUDE_OCTEON_USEUN
+int octeon_use_unalign = 1;
+#else
+int octeon_use_unalign = 0;
+#endif
+
 
 /* FIXME: These should be shared with gdb somehow.  */
 
@@ -428,6 +435,49 @@ static const struct mips_cp0sel_name mips_cp0sel_names_sb1[] =
   { 29, 3, "c0_datahi_d"	},
 };
 
+static const char * const mips_cp0_names_octeon[32] = {
+  "c0_index",     "c0_random",    "c0_entrylo0",  "c0_entrylo1",
+  "c0_context",   "c0_pagemask",  "c0_wired",     "c0_hwrena",
+  "c0_badvaddr",  "c0_count",     "c0_entryhi",   "c0_compare",
+  "c0_status",    "c0_cause",     "c0_epc",       "c0_prid",
+  "c0_config",    "$17",          "c0_watchlo",   "c0_watchhi",
+  "c0_xcontext",  "$21",          "c0_mdebug",    "c0_debug",
+  "c0_depc",      "c0_perfctl0",  "$26",          "c0_cacheerri",
+  "c0_tagloi",    "c0_taghii",    "c0_errorepc",  "c0_desave",
+};
+
+static const struct mips_cp0sel_name mips_cp0sel_names_octeon[] = {
+  { 4,  2, "c0_userlocal"       },
+  { 5,  1, "c0_pagegrain"	},
+  { 9,  6, "c0_cvmcount"	},
+  { 9,  7, "c0_cvmctl"		},
+  { 11, 6, "c0_powthr"		},
+  { 11, 7, "c0_cvmmemctl"	},
+  { 12, 1, "c0_intctl"		},
+  { 12, 2, "c0_srsctl"		},
+  { 15, 1, "c0_ebase"		},
+  { 16, 1, "c0_config1"		},
+  { 16, 2, "c0_config2"		},
+  { 16, 3, "c0_config3"		},
+  { 16, 4, "c0_config4"		},
+  { 18, 1, "c0_watchlo1"	},
+  { 19, 1, "c0_watchhi1"	},
+  { 23, 6, "c0_debug2"          },
+  { 25, 1, "c0_perfval0"	},
+  { 25, 2, "c0_perfctl1"	},
+  { 25, 3, "c0_perfval1"	},
+  { 27, 1, "c0_cacheerrd"	},
+  { 28, 1, "c0_dataloi"		},
+  { 28, 2, "c0_taglod"		},
+  { 28, 3, "c0_datalod"		},
+  { 29, 1, "c0_datahii"		},
+  { 29, 2, "c0_taghid"		},
+  { 29, 3, "c0_datahid"		},
+  { 31, 2, "c0_kscratch1"       },
+  { 31, 3, "c0_kscratch2"       },
+  { 31, 4, "c0_kscratch3"       },
+};
+
 /* Xlr cop0 register names.  */
 static const char * const mips_cp0_names_xlr[32] = {
   "c0_index",     "c0_random",    "c0_entrylo0",  "c0_entrylo1",
@@ -590,7 +640,7 @@ const struct mips_arch_choice mips_arch_choices[] =
 
   { "mips32r2",	1, bfd_mach_mipsisa32r2, CPU_MIPS32R2,
     (ISA_MIPS32R2 | INSN_SMARTMIPS | INSN_DSP | INSN_DSPR2
-     | INSN_MIPS3D | INSN_MT | INSN_MCU),
+     | INSN_MIPS3D | INSN_MT | INSN_MCU | INSN_VIRT),
     mips_cp0_names_mips3264r2,
     mips_cp0sel_names_mips3264r2, ARRAY_SIZE (mips_cp0sel_names_mips3264r2),
     mips_hwr_names_mips3264r2 },
@@ -604,7 +654,7 @@ const struct mips_arch_choice mips_arch_choices[] =
 
   { "mips64r2",	1, bfd_mach_mipsisa64r2, CPU_MIPS64R2,
     (ISA_MIPS64R2 | INSN_MIPS3D | INSN_DSP | INSN_DSPR2
-     | INSN_DSP64 | INSN_MT | INSN_MDMX | INSN_MCU),
+     | INSN_DSP64 | INSN_MT | INSN_MDMX | INSN_MCU | INSN_VIRT),
     mips_cp0_names_mips3264r2,
     mips_cp0sel_names_mips3264r2, ARRAY_SIZE (mips_cp0sel_names_mips3264r2),
     mips_hwr_names_mips3264r2 },
@@ -628,16 +678,24 @@ const struct mips_arch_choice mips_arch_choices[] =
     NULL, 0, mips_hwr_names_numeric },
 
   { "octeon",   1, bfd_mach_mips_octeon, CPU_OCTEON,
-    ISA_MIPS64R2 | INSN_OCTEON, mips_cp0_names_numeric, NULL, 0,
+    ISA_MIPS64R2 | INSN_OCTEON, mips_cp0_names_octeon,
+    mips_cp0sel_names_octeon, ARRAY_SIZE (mips_cp0sel_names_octeon),
     mips_hwr_names_numeric },
 
   { "octeon+",   1, bfd_mach_mips_octeonp, CPU_OCTEONP,
-    ISA_MIPS64R2 | INSN_OCTEONP, mips_cp0_names_numeric,
-    NULL, 0, mips_hwr_names_numeric },
+    ISA_MIPS64R2 | INSN_OCTEONP, mips_cp0_names_octeon,
+    mips_cp0sel_names_octeon, ARRAY_SIZE (mips_cp0sel_names_octeon),
+    mips_hwr_names_numeric },
 
   { "octeon2",   1, bfd_mach_mips_octeon2, CPU_OCTEON2,
-    ISA_MIPS64R2 | INSN_OCTEON2, mips_cp0_names_numeric,
-    NULL, 0, mips_hwr_names_numeric },
+    ISA_MIPS64R2 | INSN_OCTEON2, mips_cp0_names_octeon,
+    mips_cp0sel_names_octeon, ARRAY_SIZE (mips_cp0sel_names_octeon),
+    mips_hwr_names_numeric },
+
+  { "octeon3",   1, bfd_mach_mips_octeon3, CPU_OCTEON3,
+    ISA_MIPS64R2 | INSN_OCTEON3 | INSN_VIRT,
+    mips_cp0_names_octeon, mips_cp0sel_names_octeon,
+    ARRAY_SIZE (mips_cp0sel_names_octeon), mips_hwr_names_numeric },
 
   { "xlr", 1, bfd_mach_mips_xlr, CPU_XLR,
     ISA_MIPS64 | INSN_XLR,
@@ -747,6 +805,14 @@ is_newabi (Elf_Internal_Ehdr *header)
   return 0;
 }
 
+static int
+is_octeon (struct disassemble_info *info)
+{
+  return info->mach == CPU_OCTEON
+    || info->mach == CPU_OCTEONP
+    || info->mach == CPU_OCTEON2;
+}
+
 /* Check if the object has microMIPS ASE code.  */
 
 static int
@@ -817,6 +883,17 @@ parse_mips_dis_option (const char *option, unsigned int len)
   const char *val;
   const struct mips_abi_choice *chosen_abi;
   const struct mips_arch_choice *chosen_arch;
+
+  if (strcmp ("octeon-useun", option) == 0)
+    {
+      octeon_use_unalign = 1;
+      return;
+    }
+  if (strcmp ("no-octeon-useun", option) == 0)
+    {
+      octeon_use_unalign = 0;
+      return;
+    }
 
   /* Try to match options that are simple flags */
   if (CONST_STRNEQ (option, "no-aliases"))
@@ -1505,6 +1582,27 @@ print_insn_mips (bfd_vma memaddr,
 	      if (!opcode_is_member (op, mips_isa, mips_processor)
 		  && strcmp (op->name, "jalx"))
 		continue;
+
+	      if (is_octeon (info) && octeon_use_unalign)
+                {
+                  if (strcmp (op->name, "lwl") == 0
+                      || strcmp (op->name, "ldl") == 0
+                      || strcmp (op->name, "swl") == 0
+                      || strcmp (op->name, "sdl") == 0
+                      || strcmp (op->name, "lcache") == 0
+                      || strcmp (op->name, "scache") == 0
+                      || strcmp (op->name, "flush") == 0)
+                    continue;
+                                                                                
+                  if (strcmp (op->name, "ldr") == 0
+                       || strcmp (op->name, "lwr") == 0
+                       || strcmp (op->name, "swr") == 0
+                       || strcmp (op->name, "sdr") == 0)
+                    {
+                      (*info->fprintf_func) (info->stream, "nop");
+                      return INSNLEN;
+                    }
+                }
 
 	      /* Figure out instruction type and branch delay information.  */
 	      if ((op->pinfo & INSN_UNCOND_BRANCH_DELAY) != 0)
@@ -3032,6 +3130,12 @@ print_mips_disassembler_options (FILE *stream)
   fprintf (stream, _("\n\
 The following MIPS specific disassembler options are supported for use\n\
 with the -M switch (multiple options should be separated by commas):\n"));
+
+  fprintf (stream, _("\n\
+  octeon-useun             Disassemble Octeon unaligned load/store instructions.\n"));
+
+  fprintf (stream, _("\n\
+  no-octeon-useun          Disassemble mips unaligned load/store instructions.\n"));
 
   fprintf (stream, _("\n\
   gpr-names=ABI            Print GPR names according to  specified ABI.\n\
