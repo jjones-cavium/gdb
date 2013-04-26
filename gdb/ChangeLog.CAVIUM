@@ -1,5 +1,27 @@
 2013-04-25  Andrew Pinski  <apinski@cavium.com>
 
+	* remote-octeon.c (_initialize_octeon): Add prototype.
+	(close_connection): Fix arguments list; use void type.
+	(create_connection): Likewise.
+	(octeon_add_commands): Likewise.
+	(check_if_simulator): Likewise.
+	(get_focus): Likewise.
+	(octeon_supports_non_stop): Likewise.
+	(octeon_multicore_hw_breakpoint): Likewise.
+	(octeon_multicore_hw_watchpoint): Likewise.
+	(octeon_get_core_number): Likewise.
+	(convert_active_cores_to_string): Likewise.
+	(get_core_mask): Likewise.
+	(process_T_packet): Switch over to GDB_SIGNAL_* from TARGET_SIGNAL_*.
+	(octeon_wait): Likewise.
+	(octeon_fetch_registers): Fix argument to gdbarch_byte_order.
+	(octeon_resume): Last argument is enum gdb_signal. 
+	(octeon_prepare_to_store): Add correct arguments.
+	(octeon_kill): Likewise.
+	(octeon_mourn_inferior): Likewise.
+
+2013-04-25  Andrew Pinski  <apinski@cavium.com>
+
 	* remote-run.c (remote_resume): Last argument is enum gdb_signal.
 	(generic_remote_resume): Likewise.
 

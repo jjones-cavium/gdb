@@ -50,9 +50,11 @@
 struct target_ops octeon_ops, octeon_pci_ops;
 
 extern void set_resumed_once (void);
+void _initialize_octeon (void);
+
 /* Local function declarations */
-static void close_connection ();
-static void create_connection ();
+static void close_connection (void);
+static void create_connection (void);
 static void simulator_fork (char **);
 static void agent_fork (char **);
 static int gets_octeondebug (char *);
@@ -82,7 +84,7 @@ static void show_performance_counter0_event_and_counter
 (struct ui_file *, int, struct cmd_list_element *, const char *);
 static void show_performance_counter1_event_and_counter
 (struct ui_file *, int, struct cmd_list_element *, const char *);
-static void octeon_resume (struct target_ops *ops, ptid_t ptid, int step, enum target_signal sigal);
+static void octeon_resume (struct target_ops *ops, ptid_t ptid, int step, enum gdb_signal sigal);
 
 /* Send ^C to target to halt it.  Target will respond, and send us a packet. */
 static void (*ofunc) (int);
@@ -547,7 +549,7 @@ octeon_interrupt_connect (int signo)
 /* Create octeon_desc.  Spawn the simulator if debugging over tcp.  */
 
 static void
-create_connection ()
+create_connection (void)
 {
   int j;
 
@@ -627,7 +629,7 @@ create_connection ()
    resort and sleep until things get cleaned up.  */
 
 static void
-close_connection ()
+close_connection (void)
 {
   if (octeon_desc)
     {
@@ -935,7 +937,7 @@ Use the \"file\" or \"exec-file\" command.");
 }
 /* Octeon specific commands, available after the target command is invoked.  */
 static void
-octeon_add_commands ()
+octeon_add_commands (void)
 {
   /* Dummy variable, initialized when set focus command is invoked but
      ignored by process_core_command. */
@@ -985,7 +987,7 @@ Show the performance counter1 event and counter\n"),
 }
 
 static int 
-check_if_simulator ()
+check_if_simulator (void)
 {
   if (serial_port_name)
     {
@@ -1204,7 +1206,7 @@ send_command_get_int_reply (char *command, int error)
    be called anytime it's possible that the two may be out of
    sync.  */
 static void
-get_focus ()
+get_focus (void)
 {
   char prompt[32];
   cache_mem_addr = 0;
@@ -1301,7 +1303,7 @@ process_T_packet (ptid_t ptid, char *packet, struct target_waitstatus *status)
   /* The debug stub sends "T9" for hardware breakpoints and software
      breakpoints.  */
   if (packet[1] == '9')
-    status->value.sig = TARGET_SIGNAL_TRAP;
+    status->value.sig = GDB_SIGNAL_TRAP;
   else
     process_watchpoint_packet (packet);
   /* Update the step-all mode if user has modified.  */
@@ -1324,7 +1326,7 @@ octeon_wait (struct target_ops *ops, ptid_t ptid,
   last_wp_p = 0;
 
   status->kind = TARGET_WAITKIND_STOPPED;
-  status->value.sig = TARGET_SIGNAL_TRAP;
+  status->value.sig = GDB_SIGNAL_TRAP;
 
   octeon_internal_wait(packet);
 
@@ -1336,7 +1338,7 @@ octeon_wait (struct target_ops *ops, ptid_t ptid,
   if (*packet == 'D')
     {
       status->kind = TARGET_WAITKIND_EXITED;
-      status->value.sig = TARGET_SIGNAL_TRAP;
+      status->value.sig = GDB_SIGNAL_TRAP;
       status->value.integer = from_hex (packet[1]);
       end_status = (1u << octeon_coreid);
     }
@@ -1344,19 +1346,19 @@ octeon_wait (struct target_ops *ops, ptid_t ptid,
     {
       error ("Wrong signal from target \n");
       status->kind = TARGET_WAITKIND_STOPPED;
-      status->value.sig = TARGET_SIGNAL_ILL;
+      status->value.sig = GDB_SIGNAL_ILL;
     }
   if (octeon_control_c_hit)
     {
       status->kind = TARGET_WAITKIND_STOPPED;
-      status->value.sig = TARGET_SIGNAL_INT;
+      status->value.sig = GDB_SIGNAL_INT;
     }
   had_hit_break_once_before = 0;
   return inferior_ptid;
 }
 
 static int
-octeon_supports_non_stop ()
+octeon_supports_non_stop (void)
 {
   return 0;
 }
@@ -1391,7 +1393,7 @@ octeon_detach (struct target_ops *ops, char *args, int from_tty)
 
 /* Tell the remote machine to resume.  */
 static void
-octeon_resume (struct target_ops *ops, ptid_t ptid, int step, enum target_signal sigal)
+octeon_resume (struct target_ops *ops, ptid_t ptid, int step, enum gdb_signal sigal)
 {
   cache_mem_addr = 0;
   stepping = !!step;
@@ -1410,7 +1412,7 @@ octeon_fetch_registers (struct target_ops *ops,
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   char reg[MAX_REGISTER_SIZE];
   char *packet = alloca (PBUFSIZ);
-  enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
 
   if (regno > gdbarch_num_regs (gdbarch))
     return;
@@ -1452,9 +1454,10 @@ octeon_store_registers (struct target_ops *ops, struct regcache *regcache, int r
    that registers contains all the registers from the program being
    debugged.  */
 static void
-octeon_prepare_to_store ()
+octeon_prepare_to_store (struct regcache *unused)
 {
   /* Do nothing, since we can store individual regs */
+  (void)unused;
 }
 
 /* Print info on this target.  */
@@ -1621,8 +1624,9 @@ octeon_xfer_inferior_memory (CORE_ADDR memaddr, gdb_byte * myaddr, int len,
 }
 
 static void
-octeon_kill ()
+octeon_kill (struct target_ops *target_ops)
 {
+  (void)target_ops;
   target_mourn_inferior ();
 }
 
@@ -1639,7 +1643,7 @@ octeon_load (char *args, int from_tty)
 /* Clean up when a program exits.  */
 
 static void
-octeon_mourn_inferior ()
+octeon_mourn_inferior (struct target_ops *unused)
 {
   close_connection ();
   unpush_target (&octeon_ops);
@@ -1647,13 +1651,13 @@ octeon_mourn_inferior ()
 }
 
 static int
-octeon_multicore_hw_breakpoint ()
+octeon_multicore_hw_breakpoint (void)
 {
   return 1;
 }
 
 static int
-octeon_multicore_hw_watchpoint ()
+octeon_multicore_hw_watchpoint (void)
 {
   return 1;
 }
@@ -1695,7 +1699,7 @@ octeon_can_use_watchpoint (int type, int cnt, int othertype)
 }
 
 static int 
-octeon_get_core_number ()
+octeon_get_core_number (void)
 {
   if (remote_debug)
     fprintf_unfiltered (gdb_stderr, "get_core_number: %d\n", octeon_coreid);
@@ -1893,7 +1897,7 @@ octeon_remove_breakpoint (struct gdbarch *gdbarch, struct bp_target_info *bp_tgt
 }
 
 static void
-convert_active_cores_to_string ()
+convert_active_cores_to_string (void)
 {
   char output[MAX_CORES * 3 + 1];
   int i;
@@ -2120,7 +2124,7 @@ process_mask_command (char *args, int from_tty,
 
 /* Get the octeon_activecores from debug stub.  */
 static void 
-get_core_mask ()
+get_core_mask (void)
 {
    octeon_activecores = send_command_get_int_reply ("i", octeon_activecores);
    convert_active_cores_to_string ();
