@@ -1,3 +1,8 @@
+2013-04-26  Andrew Pinski  <apinski@cavium.com>
+
+	* testsuite/gdb.octeon/3.exp: Correct arguments to
+	get_compiler_info.
+
 2013-04-25  Andrew Pinski  <apinski@cavium.com>
 
 	* mips-tdep.c: Include regset.h.
