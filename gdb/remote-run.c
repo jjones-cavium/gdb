@@ -36,7 +36,7 @@
 #include "gdbthread.h"
 
 /* Original to_remote handler.  */
-static void (*remote_resume) (struct target_ops *ops, ptid_t, int, enum target_signal);
+static void (*remote_resume) (struct target_ops *ops, ptid_t, int, enum gdb_signal);
 
 /* Count the number of resumes since the last open.  If we just hit
    the debug exception handler after the target command there is no
@@ -128,7 +128,7 @@ set_resumed_once ()
    debugging the program.  */
 
 static void
-generic_remote_resume (struct target_ops *ops, ptid_t ptid, int step, enum target_signal signal)
+generic_remote_resume (struct target_ops *ops, ptid_t ptid, int step, enum gdb_signal signal)
 {
   if (remote_debug && !resumed_once)
     fprintf_unfiltered (gdb_stdlog, "generic_remote_resume: resumed once\n");
