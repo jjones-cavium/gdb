@@ -58,6 +58,7 @@
 #include "user-regs.h"
 #include "valprint.h"
 #include "ax.h"
+#include "regset.h"
 
 static const struct objfile_data *mips_pdr_data;
 
@@ -3555,7 +3556,7 @@ octeon_exception_frame_cache (struct frame_info *this_frame, void **this_cache)
   if ((*this_cache) != NULL)
     return (*this_cache);
 
-  cache = trad_frame_cache_zalloc (this_frame);
+  cache = FRAME_OBSTACK_ZALLOC (struct mips_frame_cache);
   (*this_cache) = cache;
   cache->saved_regs = trad_frame_alloc_saved_regs (this_frame);
 
@@ -7768,7 +7769,7 @@ mips_in_return_stub (struct gdbarch *gdbarch, CORE_ADDR pc, const char *name)
    which we can unwind correctly.  */
 
 static int
-octeon_in_solib_return_trampoline (struct gdbarch *gdbarch, CORE_ADDR pc, char *name)
+octeon_in_solib_return_trampoline (struct gdbarch *gdbarch, CORE_ADDR pc, const char *name)
 {
   if (name == NULL && pc == 0xffffffff80001180)
     return 1;
@@ -7842,7 +7843,7 @@ octeon_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
      When hitting the exception vector skip to cvmx_interrupt_do_irq() which 
      is called from stage2.  Note that cvmx_interrupt_do_irq is only
      available in CVMX apps. */
-  if (is_octeon (gdbarch, NULL) && pc == 0xffffffff80001180ull)
+  if (is_octeon (gdbarch) && pc == 0xffffffff80001180ull)
     {
       struct minimal_symbol *msymbol;
 
@@ -7855,7 +7856,7 @@ octeon_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
 }
 
 static CORE_ADDR
-octeon_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
+mips_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
 {
   CORE_ADDR requested_pc = pc;
   CORE_ADDR target_pc;
@@ -8737,7 +8738,7 @@ mips_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
       if (info.bfd_arch_info != NULL
           && info.bfd_arch_info->mach == bfd_mach_mips3900)
         reg_names = mips_tx39_reg_names;
-      else if (info.bfd_arch_info != NULL && is_octeon (gdbarch, info.bfd_arch_info))
+      else if (arches != NULL && is_octeon (arches->gdbarch))
 	{
 	  reg_names = mips_octeon_reg_names;
 	  /* Increase the timeout to wait for the simulator to be spawned
@@ -9406,7 +9407,7 @@ mips_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 
   /* Unwind the frame.  */
   dwarf2_append_unwinders (gdbarch);
-  if (is_octeon (gdbarch, info.bfd_arch_info))
+  if (is_octeon (gdbarch))
     {
       /* On Octeon we are abusing the solib hooks to skip to the exception 
 	 frame from which we can unwind correctly.  */

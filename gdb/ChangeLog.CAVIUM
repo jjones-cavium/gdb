@@ -1,5 +1,17 @@
 2013-04-25  Andrew Pinski  <apinski@cavium.com>
 
+	* mips-tdep.c: Include regset.h.
+	(octeon_exception_frame_cache): Use FRAME_OBSTACK_ZALLOC
+	instead of trad_frame_cache_zalloc.
+	(octeon_in_solib_return_trampoline): Fix last argument type.
+	(octeon_skip_trampoline_code): Remove second argument to is_octeon.
+	(octeon_skip_trampoline_code): Rename the second one to ...
+	(mips_skip_trampoline_code): This.
+	(mips_gdbarch_init): Fix call to is_octeon.
+	(mips_gdbarch_init): Likewise.
+
+2013-04-25  Andrew Pinski  <apinski@cavium.com>
+
 	* remote-octeon.c (_initialize_octeon): Add prototype.
 	(close_connection): Fix arguments list; use void type.
 	(create_connection): Likewise.
