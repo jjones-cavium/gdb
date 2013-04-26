@@ -23,14 +23,15 @@ set testfile "3"
 set srcfile ${testfile}.cc
 set binfile ${objdir}/${subdir}/${testfile}.out
 
+if [get_compiler_info "c++"] {
+    return -1
+}
+
 if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug c++}] != "" } {
       fail "compilation"
       return
 }
 
-if [get_compiler_info ${binfile} "c++"] {
-    return -1
-}
 
 pass "compilation"
 
