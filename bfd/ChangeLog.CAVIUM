@@ -1,3 +1,9 @@
+2013-05-01  Andrew Pinski  <apinski@cavium.com>
+
+	Bug #6840
+	* elfxx-mips.c (_bfd_mips_elf_additional_program_headers):
+	Correct the way to access elf_eh_frame_hdr.
+
 2013-04-18  Andrew Pinski  <apinski@cavium.com>
 
 	Bug #6715

@@ -11183,7 +11183,7 @@ _bfd_mips_elf_additional_program_headers (bfd *abfd,
      going to if the section was created.  Once the segment is created
      the generic code already accounts for this so don't increment in
      that case.  */
-  if (!elf_tdata (abfd)->eh_frame_hdr
+  if (!elf_eh_frame_hdr (abfd)
       && bfd_get_section_by_name (abfd, ".eh_frame_hdr"))
     ++ret;
 
