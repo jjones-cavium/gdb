@@ -1,3 +1,9 @@
+2013-05-09  Manjunath S Matti  <mmatti@caviumnetworks.com>
+	
+	* mips-tdep.c (mips_gdbarch_init): Add bfd_mach_mips_octeon3 
+	to set the ABI to N64 and fpu_type to MIPS_FPU_DOUBLE.
+	(is_octeon): Add support to identify octeon3.
+
 2013-04-26  Andrew Pinski  <apinski@cavium.com>
 
 	* testsuite/gdb.octeon/3.exp: Correct arguments to

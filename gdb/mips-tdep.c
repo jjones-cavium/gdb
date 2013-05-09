@@ -1489,7 +1489,8 @@ is_octeon (struct gdbarch *gdbarch)
 
   return (info->mach == bfd_mach_mips_octeon
          || info->mach == bfd_mach_mips_octeonp
-         || info->mach == bfd_mach_mips_octeon2);
+         || info->mach == bfd_mach_mips_octeon2
+         || info->mach == bfd_mach_mips_octeon3);
 }
 
 /* Return true if the OP represents the Octeon's BBIT instruction.  */
@@ -8961,6 +8962,7 @@ mips_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 	case bfd_mach_mips_octeon:
 	case bfd_mach_mips_octeonp:
 	case bfd_mach_mips_octeon2:
+	case bfd_mach_mips_octeon3:
 	  found_abi = MIPS_ABI_N64;
 	  break;
 	}
@@ -9052,6 +9054,9 @@ mips_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
       case bfd_mach_mips_octeonp:
       case bfd_mach_mips_octeon2:
 	fpu_type = MIPS_FPU_NONE;
+	break;
+      case bfd_mach_mips_octeon3:
+	fpu_type = MIPS_FPU_DOUBLE;
 	break;
       case bfd_mach_mips4650:
 	fpu_type = MIPS_FPU_SINGLE;
