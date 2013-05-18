@@ -1,4 +1,9 @@
 2013-05-17  Andrew Pinski  <apinski@cavium.com>
+
+	* mips-tdep.c (mips_gdbarch_init): Also look at the abi of the fp
+	to say if this is an octeon3 or not.
+
+2013-05-17  Andrew Pinski  <apinski@cavium.com>
 	
 	Bug #6964
 	* mips-tdep.c (mips_octeon3_reg_names): New static variable.

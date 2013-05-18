@@ -8754,7 +8754,16 @@ mips_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
                    || info.bfd_arch_info->mach == bfd_mach_mips_octeon2
                    || info.bfd_arch_info->mach == bfd_mach_mips_octeon3))
 	{
-	  if (info.bfd_arch_info->mach == bfd_mach_mips_octeon3)
+	  int elf_fpu_type = 0;
+	  /* Determine the MIPS FPU type.  */
+#ifdef HAVE_ELF
+	  if (info.abfd
+	      && bfd_get_flavour (info.abfd) == bfd_target_elf_flavour)
+	    elf_fpu_type = bfd_elf_get_obj_attr_int (info.abfd, OBJ_ATTR_GNU,
+						     Tag_GNU_MIPS_ABI_FP);
+#endif /* HAVE_ELF */
+	  if (info.bfd_arch_info->mach == bfd_mach_mips_octeon3
+	      || elf_fpu_type == 1 || elf_fpu_type == 2)
 	    reg_names = mips_octeon3_reg_names;
 	  else
 	    reg_names = mips_octeon_reg_names;
