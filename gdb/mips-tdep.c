@@ -559,6 +559,15 @@ static const char *mips_octeon_reg_names[NUM_MIPS_PROCESSOR_REGS] = {
   "", "", "", "", "", "", "", ""
 };
 
+static const char *mips_octeon3_reg_names[NUM_MIPS_PROCESSOR_REGS] = {
+  "status", "lo", "hi", "badvaddr", "cause", "pc",
+  "f0", "f1", "f2", "f3", "f4", "f5", "f6", "f7",
+  "f8", "f9", "f10", "f11", "f12", "f13", "f14", "f15",
+  "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23",
+  "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31",
+  "fsr", "fir",
+};
+
 
 /* Return the name of the register corresponding to REGNO.  */
 static const char *
@@ -8739,9 +8748,16 @@ mips_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
       if (info.bfd_arch_info != NULL
           && info.bfd_arch_info->mach == bfd_mach_mips3900)
         reg_names = mips_tx39_reg_names;
-      else if (arches != NULL && is_octeon (arches->gdbarch))
+      else if (info.bfd_arch_info != NULL
+               && (info.bfd_arch_info->mach == bfd_mach_mips_octeon
+                   || info.bfd_arch_info->mach == bfd_mach_mips_octeonp
+                   || info.bfd_arch_info->mach == bfd_mach_mips_octeon2
+                   || info.bfd_arch_info->mach == bfd_mach_mips_octeon3))
 	{
-	  reg_names = mips_octeon_reg_names;
+	  if (info.bfd_arch_info->mach == bfd_mach_mips_octeon3)
+	    reg_names = mips_octeon3_reg_names;
+	  else
+	    reg_names = mips_octeon_reg_names;
 	  /* Increase the timeout to wait for the simulator to be spawned
 	     to communicate with the debug stub.  */
 	  remote_timeout = 100;

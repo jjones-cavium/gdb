@@ -1,3 +1,10 @@
+2013-05-17  Andrew Pinski  <apinski@cavium.com>
+	
+	Bug #6964
+	* mips-tdep.c (mips_octeon3_reg_names): New static variable.
+	(mips_gdbarch_init): Use info.bfd_arch_info instead of calling
+	is_octeon.  Also use mips_octeon3_reg_names for octeon3.
+
 2013-05-09  Manjunath S Matti  <mmatti@caviumnetworks.com>
 	
 	* mips-tdep.c (mips_gdbarch_init): Add bfd_mach_mips_octeon3 
