@@ -1,3 +1,9 @@
+2013-06-20  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* aarch64-dis.c (EMBEDDED_ENV): Remove the check on it.
+	(SYMTAB_AVAILABLE): Removed.
+	(#include "elf/aarch64.h): Ditto.
+
 2013-05-13  Yufeng Zhang  <yufeng.zhang@arm.com>
 
 	* aarch64-asm.c (aarch64_ins_advsimd_imm_modified): Remove assertion.
