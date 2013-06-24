@@ -1,3 +1,7 @@
+2013-04-26  Will Newton  <will.newton@linaro.org>
+
+	* elf64-aarch64.c (elf64_aarch64_check_relocs): Remove dead code.
+
 2013-04-03   Venkataramanan Kumar  <venkataramanan.kumar@linaro.org>
 
 	* elf64-aarch64.c (elf64_aarch64_gc_sweep_hook): Use
