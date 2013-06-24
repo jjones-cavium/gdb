@@ -1,3 +1,8 @@
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* aarch64-tdep.c (aarch64_analyze_prologue): Change type of local
+	'is64' to signed 'int'.
+
 2013-04-17  Yufeng Zhang  <yufeng.zhang@arm.com>
 
 	* aarch64-tdep.c (aarch64_write_pc): Removed.
