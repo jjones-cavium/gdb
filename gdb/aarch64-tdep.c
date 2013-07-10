@@ -2507,6 +2507,26 @@ value_of_aarch64_user_reg (struct frame_info *frame, const void *baton)
 
   return value_of_register (*reg_p, frame);
 }
+
+static int 
+aarch64_workaroundsvcbug (struct frame_info *frame)
+{
+  struct gdbarch *gdbarch = get_frame_arch (frame);
+  struct address_space *aspace = get_frame_address_space (frame);
+  enum bfd_endian byte_order = gdbarch_byte_order_for_code (gdbarch);
+  CORE_ADDR pc = get_frame_pc (frame);
+  CORE_ADDR breaks[2] = {-1, -1};
+  CORE_ADDR loc = pc;
+  CORE_ADDR closing_insn; /* Instruction that closes the atomic sequence.  */
+  int insn = read_memory_integer (pc, 4, byte_order);
+
+  /* Instruction is not svc. */
+  if (insn != 0xd4000001)
+    return 0;
+
+  insert_single_step_breakpoint (gdbarch, aspace, pc + 4);
+  return 1;
+}
 
 
 /* Initialize the current architecture based on INFO.  If possible,
@@ -2691,6 +2711,8 @@ aarch64_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
     user_reg_add (gdbarch, aarch64_register_aliases[i].name,
 		  value_of_aarch64_user_reg,
 		  &aarch64_register_aliases[i].regnum);
+
+  set_gdbarch_software_single_step (gdbarch, aarch64_workaroundsvcbug);
 
   return gdbarch;
 }

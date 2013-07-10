@@ -1,3 +1,9 @@
+2013-07-09  Andrew Pinski  <apinski@cavium.com>
+
+	Work around an asim bug
+	* aarch64-tdep.c (aarch64_workaroundsvcbug): New function.
+	(aarch64_gdbarch_init): Call set_gdbarch_software_single_step.
+
 2013-05-29  Pedro Alves  <palves@redhat.com>
 
 	* aarch64-tdep.c: Don't include "features/aarch64-without-fpu.c".
