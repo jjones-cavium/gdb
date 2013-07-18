@@ -270,8 +270,12 @@ aarch64_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 
   tdep->lowest_pc = 0x8000;
 
-  set_solib_svr4_fetch_link_map_offsets (gdbarch,
-					 svr4_lp64_fetch_link_map_offsets);
+  /* FIXME: this breaks running of the programs for some reason.
+     I think the issue is the loading of vdso is what is causing the issue.  */
+  if (0 && tdep->ilp32)
+    set_solib_svr4_fetch_link_map_offsets (gdbarch, svr4_ilp32_fetch_link_map_offsets);
+  else
+    set_solib_svr4_fetch_link_map_offsets (gdbarch, svr4_lp64_fetch_link_map_offsets);
 
   /* Enable TLS support.  */
   set_gdbarch_fetch_tls_load_module_address (gdbarch,

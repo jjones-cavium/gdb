@@ -92,6 +92,9 @@ struct gdbarch_tdep
   struct type *vns_type;
   struct type *vnh_type;
   struct type *vnb_type;
+
+  /* If this is ILP32 or LP64.  */
+  int ilp32;
 };
 
 #endif /* aarch64-tdep.h */
