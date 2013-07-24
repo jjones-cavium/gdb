@@ -1,3 +1,8 @@
+2013-07-23  Andrew Pinski  <apinski@cavium.com>
+
+	* aarch64-linux-tdep.c (aarch64_linux_init_abi):
+	Re-enable ilp32 support; it works now.
+
 2013-07-18  Andrew Pinski  <apinski@cavium.com>
 
 	* aarch64-linux-tdep.c (aarch64_linux_init_abi):
