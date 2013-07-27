@@ -1,3 +1,9 @@
+2013-07-27  Andrew Pinski  <apinski@cavium.com>
+
+	Bug #7585
+	* aarch64-linux-nat.c (aarch64_linux_set_debug_regs): Zero out
+	regs.
+
 2013-07-23  Andrew Pinski  <apinski@cavium.com>
 
 	* aarch64-linux-tdep.c (aarch64_linux_init_abi):
