@@ -1,3 +1,13 @@
+2013-08-06  Andrew Pinski  <apinski@cavium.com>
+
+	Bug #7666
+	* aarch64-linux-nat.c (supply_64bit_reg): New function.
+	(collect_64bit_reg): New funciton.
+	(fetch_gregs_from_thread): Use supply_64bit_reg instead
+	of calling regcache_raw_supply directly.
+	(store_gregs_to_thread): Use collect_64bit_reg instead
+	of calling regcache_raw_collect directly.
+
 2013-07-27  Andrew Pinski  <apinski@cavium.com>
 
 	Bug #7585

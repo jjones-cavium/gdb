@@ -456,6 +456,37 @@ aarch64_show_debug_reg_state (struct aarch64_debug_reg_state *state,
 			state->dr_ctrl_wp[i], state->dr_ref_count_wp[i]);
 }
 
+/* Supply a 64-bit register.  */
+
+static void
+supply_64bit_reg (struct regcache *regcache, int regnum,
+		  const gdb_byte *buf)
+{
+  struct gdbarch *gdbarch = get_regcache_arch (regcache);
+  if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG
+      && register_size (gdbarch, regnum) == 4)
+    regcache_raw_supply (regcache, regnum, buf + 4);
+  else
+    regcache_raw_supply (regcache, regnum, buf);
+}
+
+/* Collect a 64-bit register.  */
+
+static void
+collect_64bit_reg (struct regcache *regcache, int regnum,
+		   const gdb_byte *buf)
+{
+  struct gdbarch *gdbarch = get_regcache_arch (regcache);
+  if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG
+      && register_size (gdbarch, regnum) == 4)
+    {
+      memset (buf, 0, 8);
+      regcache_raw_collect (regcache, regnum, buf + 4);
+    }
+  else
+    regcache_raw_collect (regcache, regnum, buf);
+}
+
 /* Fill GDB's register array with the general-purpose register values
    from the current thread.  */
 
@@ -476,8 +507,8 @@ fetch_gregs_from_thread (struct regcache *regcache)
     perror_with_name (_("Unable to fetch general registers."));
 
   for (regno = AARCH64_X0_REGNUM; regno <= AARCH64_CPSR_REGNUM; regno++)
-    regcache_raw_supply (regcache, regno,
-			 (char *) &regs[regno - AARCH64_X0_REGNUM]);
+    supply_64bit_reg (regcache, regno,
+		      (gdb_byte*) &regs[regno - AARCH64_X0_REGNUM]);
 }
 
 /* Store to the current thread the valid general-purpose register
@@ -501,8 +532,8 @@ store_gregs_to_thread (const struct regcache *regcache)
 
   for (regno = AARCH64_X0_REGNUM; regno <= AARCH64_CPSR_REGNUM; regno++)
     if (REG_VALID == regcache_register_status (regcache, regno))
-      regcache_raw_collect (regcache, regno,
-			    (char *) &regs[regno - AARCH64_X0_REGNUM]);
+      collect_64bit_reg (regcache, regno,
+			 (gdb_byte*) &regs[regno - AARCH64_X0_REGNUM]);
 
   ret = ptrace (PTRACE_SETREGSET, tid, NT_PRSTATUS, &iovec);
   if (ret < 0)
