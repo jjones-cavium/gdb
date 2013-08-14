@@ -6245,6 +6245,9 @@ _bfd_elf_mips_mach (flagword flags)
     case E_MIPS_MACH_LS3A:
       return bfd_mach_mips_loongson_3a;
 
+    case E_MIPS_MACH_OCTEON3:
+      return bfd_mach_mips_octeon3;
+
     case E_MIPS_MACH_OCTEON2:
       return bfd_mach_mips_octeon2;
 

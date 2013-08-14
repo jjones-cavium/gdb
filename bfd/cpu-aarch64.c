@@ -34,27 +34,11 @@ compatible (const bfd_arch_info_type * a, const bfd_arch_info_type * b)
   if (a->arch != b->arch)
     return NULL;
 
-  /* If a & b are for the same machine then all is well.  */
-  if (a->mach == b->mach)
-    return a;
-
-  /* Otherwise if either a or b is the 'default' machine
-     then it can be polymorphed into the other.  */
-  if (a->the_default)
-    return b;
-
-  if (b->the_default)
-    return a;
-
-  /* So far all newer cores are
-     supersets of previous cores.  */
-  if (a->mach < b->mach)
-    return b;
-  else if (a->mach > b->mach)
-    return a;
+  /* Machine compatibility is checked in
+     elfNN_aarch64_merge_private_bfd_data.  */
 
   /* Never reached!  */
-  return NULL;
+  return a;
 }
 
 static struct
@@ -101,9 +85,11 @@ scan (const struct bfd_arch_info *info, const char *string)
     "aarch64", PRINT, 4, DEFAULT, compatible, scan,		\
     bfd_arch_default_fill, NEXT }
 
-const bfd_arch_info_type bfd_aarch64_arch =
-  N (0, "aarch64", TRUE, NULL);
+static const bfd_arch_info_type bfd_aarch64_arch_ilp32 =
+  N (bfd_mach_aarch64_ilp32, "aarch64:ilp32", FALSE, NULL);
 
+const bfd_arch_info_type bfd_aarch64_arch =
+  N (0, "aarch64", TRUE, &bfd_aarch64_arch_ilp32);
 
 bfd_boolean
 bfd_is_aarch64_special_symbol_name (const char *name, int type)
