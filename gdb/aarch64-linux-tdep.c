@@ -179,6 +179,20 @@ static const struct tramp_frame aarch64_linux_rt_sigframe =
   aarch64_linux_sigframe_init
 };
 
+/* Supply a 64-bit register.  */
+
+static void
+supply_64bit_reg (struct regcache *regcache, int regnum,
+		  const gdb_byte *buf)
+{
+  struct gdbarch *gdbarch = get_regcache_arch (regcache);
+  if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG
+      && register_size (gdbarch, regnum) == 4)
+    regcache_raw_supply (regcache, regnum, buf + 4);
+  else
+    regcache_raw_supply (regcache, regnum, buf);
+}
+
 /* Fill GDB's register array with the general-purpose register values
    in the buffer pointed by GREGS_BUF.  */
 
@@ -189,9 +203,9 @@ aarch64_linux_supply_gregset (struct regcache *regcache,
   int regno;
 
   for (regno = AARCH64_X0_REGNUM; regno <= AARCH64_CPSR_REGNUM; regno++)
-    regcache_raw_supply (regcache, regno,
-			 gregs_buf + X_REGISTER_SIZE
-			 * (regno - AARCH64_X0_REGNUM));
+    supply_64bit_reg (regcache, regno,
+		      gregs_buf + X_REGISTER_SIZE
+		       * (regno - AARCH64_X0_REGNUM));
 }
 
 /* The "supply_regset" function for the general-purpose register set.  */
@@ -270,8 +284,6 @@ aarch64_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 
   tdep->lowest_pc = 0x8000;
 
-  /* FIXME: this breaks running of the programs for some reason.
-     I think the issue is the loading of vdso is what is causing the issue.  */
   if (tdep->ilp32)
     set_solib_svr4_fetch_link_map_offsets (gdbarch, svr4_ilp32_fetch_link_map_offsets);
   else

@@ -1,3 +1,12 @@
+2013-08-14  Andrew Pinski  <apinski@cavium.com>
+
+	Bug #7734
+	* aarch64-linux-tdep.c (supply_64bit_reg): New function.
+	(aarch64_linux_supply_gregset): Use supply_64bit_reg instead
+	of calling regcache_raw_supply directly.
+	(aarch64_linux_init_abi): Remove old comment which is no longer
+	true.
+
 2013-08-06  Andrew Pinski  <apinski@cavium.com>
 
 	Bug #7666
