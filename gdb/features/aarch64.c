@@ -48,8 +48,8 @@ initialize_tdesc_aarch64 (void)
   tdesc_create_reg (feature, "x28", 28, 1, NULL, 64, "int");
   tdesc_create_reg (feature, "x29", 29, 1, NULL, 64, "int");
   tdesc_create_reg (feature, "x30", 30, 1, NULL, 64, "int");
-  tdesc_create_reg (feature, "sp", 31, 1, NULL, 64, "data_ptr");
-  tdesc_create_reg (feature, "pc", 32, 1, NULL, 64, "code_ptr");
+  tdesc_create_reg (feature, "sp", 31, 1, NULL, 64, "int64");
+  tdesc_create_reg (feature, "pc", 32, 1, NULL, 64, "uint64");
   tdesc_create_reg (feature, "cpsr", 33, 1, NULL, 32, "int");
 
   feature = tdesc_create_feature (result, "org.gnu.gdb.aarch64.fpu");

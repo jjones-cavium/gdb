@@ -1,5 +1,11 @@
 2013-08-14  Andrew Pinski  <apinski@cavium.com>
 
+	* features/aarch64-core.xml (sp): Change type to int64.
+	(pc): Change type to uint64.
+	* features/aarch64.c: Regenerate.
+
+2013-08-14  Andrew Pinski  <apinski@cavium.com>
+
 	Bug #7734
 	* aarch64-linux-tdep.c (supply_64bit_reg): New function.
 	(aarch64_linux_supply_gregset): Use supply_64bit_reg instead
