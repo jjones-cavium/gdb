@@ -318,7 +318,7 @@ extern int debug_threads;
 static CORE_ADDR
 aarch64_get_pc (struct regcache *regcache)
 {
-  unsigned long pc;
+  unsigned long long pc;
 
   collect_register_by_name (regcache, "pc", &pc);
   if (debug_threads)
@@ -329,7 +329,7 @@ aarch64_get_pc (struct regcache *regcache)
 static void
 aarch64_set_pc (struct regcache *regcache, CORE_ADDR pc)
 {
-  unsigned long newpc = pc;
+  unsigned long long newpc = pc;
   supply_register_by_name (regcache, "pc", &newpc);
 }
 
@@ -337,12 +337,12 @@ aarch64_set_pc (struct regcache *regcache, CORE_ADDR pc)
 
 #define aarch64_breakpoint_len 4
 
-static const unsigned long aarch64_breakpoint = 0x00800011;
+static const unsigned int aarch64_breakpoint = 0x00800011;
 
 static int
 aarch64_breakpoint_at (CORE_ADDR where)
 {
-  unsigned long insn;
+  unsigned int insn;
 
   (*the_target->read_memory) (where, (unsigned char *) &insn, 4);
   if (insn == aarch64_breakpoint)
@@ -604,6 +604,8 @@ aarch64_linux_set_debug_regs (const struct aarch64_debug_reg_state *state,
   count = watchpoint ? aarch64_num_wp_regs : aarch64_num_bp_regs;
   addr = watchpoint ? state->dr_addr_wp : state->dr_addr_bp;
   ctrl = watchpoint ? state->dr_ctrl_wp : state->dr_ctrl_bp;
+
+  memset (&regs, 0, sizeof (regs));
 
   for (i = 0; i < count; i++)
     {
@@ -973,8 +975,8 @@ aarch64_insert_point (char type, CORE_ADDR addr, int len)
   enum target_point_type targ_type;
 
   if (debug_hw_points)
-    fprintf (stderr, "insert_point on entry (addr=0x%08lx, len=%d)\n",
-	     (unsigned long) addr, len);
+    fprintf (stderr, "insert_point on entry (addr=0x%08llx, len=%d)\n",
+	     (unsigned long long) addr, len);
 
   /* Determine the type from the packet.  */
   targ_type = Z_packet_to_point_type (type);
@@ -1010,8 +1012,8 @@ aarch64_remove_point (char type, CORE_ADDR addr, int len)
   enum target_point_type targ_type;
 
   if (debug_hw_points)
-    fprintf (stderr, "remove_point on entry (addr=0x%08lx, len=%d)\n",
-	     (unsigned long) addr, len);
+    fprintf (stderr, "remove_point on entry (addr=0x%08llx, len=%d)\n",
+	     (unsigned long long) addr, len);
 
   /* Determine the type from the packet.  */
   targ_type = Z_packet_to_point_type (type);

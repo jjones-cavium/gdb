@@ -1,3 +1,17 @@
+2013-08-14  Andrew Pinski  <apinski@cavium.com>
+
+	* linux-aarch64-low.c (aarch64_get_pc): Use unsigned long long
+	instead of unsigned long to support gdbserver compiled with ilp32.
+	(aarch64_set_pc): Likewise.
+	(aarch64_breakpoint): Change to unsigned int since this is always
+	a 32bit value.
+	(aarch64_breakpoint_at): Use unsigend int for insn so that it works
+	on big-endian.
+	(aarch64_linux_set_debug_regs): Zero out regs before setting it.
+	(aarch64_insert_point): Use unsigned long long
+	instead of unsigned long to support gdbserver compiled with ilp32.
+	(aarch64_remove_point): Likewise.
+
 2013-05-28  Pedro Alves  <palves@redhat.com>
 
 	* Makefile.in (clean): Remove reference to aarch64-without-fpu.c.
