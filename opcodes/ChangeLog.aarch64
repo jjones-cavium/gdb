@@ -1,3 +1,8 @@
+2013-08-28  Nick Clifton  <nickc@redhat.com>
+
+	* aarch64-opc.c (aarch64_logical_immediate_p): Return FALSE if the
+	immediate is not suitable for the 32-bit ABI.
+
 2013-06-20  Yufeng Zhang  <yufeng.zhang@arm.com>
 
 	* aarch64-dis.c (EMBEDDED_ENV): Remove the check on it.
