@@ -1,3 +1,10 @@
+2013-09-08  Andrew Pinski  <apinski@cavium.com>
+
+	Bug #8019
+	* mips-tdep.c (mips_push_dummy_code): Use
+	__OCTEON_CALL_DUMMY_ADDRESS if it exists before
+	trying to use the stack.
+
 2013-05-17  Andrew Pinski  <apinski@cavium.com>
 
 	* mips-tdep.c (mips_gdbarch_init): Also look at the abi of the fp

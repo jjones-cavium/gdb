@@ -4387,7 +4387,14 @@ mips_push_dummy_code (struct gdbarch *gdbarch, CORE_ADDR sp,
   static gdb_byte nop_insn[] = { 0, 0, 0, 0 };
   CORE_ADDR nop_addr;
   CORE_ADDR bp_slot;
+  struct minimal_symbol *sym;
 
+  /* If we have an symbol named __OCTEON_CALL_DUMMY_ADDRESS use that, otherwise
+     use stack space. */
+  sym = lookup_minimal_symbol ("__OCTEON_CALL_DUMMY_ADDRESS", NULL, NULL);
+  if (sym)
+    bp_slot = SYMBOL_VALUE_ADDRESS (sym) + sizeof (nop_insn);
+  else
   /* Reserve enough room on the stack for our breakpoint instruction.  */
   bp_slot = sp - sizeof (nop_insn);
 
@@ -4406,6 +4413,8 @@ mips_push_dummy_code (struct gdbarch *gdbarch, CORE_ADDR sp,
      to prevent that from happening.  */
   nop_addr = bp_slot - sizeof (nop_insn);
   write_memory (nop_addr, nop_insn, sizeof (nop_insn));
+  /* Update the sp if needed. */
+  if (!sym)
   sp = mips_frame_align (gdbarch, nop_addr);
 
   /* Inferior resumes at the function entry point.  */
