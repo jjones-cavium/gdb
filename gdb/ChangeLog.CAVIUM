@@ -1,3 +1,13 @@
+2013-10-03  Manjunath S Matti  <mmatti@caviumnetworks.com>
+
+	Backported:
+
+	2013-09-24  Andreas Arnez  <arnez@linux.vnet.ibm.com>
+	* solib-svr4.c (svr4_read_so_list): Skip the vDSO when reading 
+	link map entries.
+	* testsuite/gdb.base/corefile.exp: Add a check to assure warning-free 
+	core-file load.
+
 2013-09-08  Andrew Pinski  <apinski@cavium.com>
 
 	Bug #8019

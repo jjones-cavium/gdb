@@ -1,3 +1,8 @@
+2013-09-24  Andreas Arnez  <arnez@linux.vnet.ibm.com>
+
+	* solib-svr4.c (svr4_read_so_list): Skip the vDSO when reading 
+	link map entries.
+
 2013-04-26  Joel Brobecker  <brobecker@adacore.com>
 
 	* NEWS: Change "since GDB 7.5" into "in GDB 7.6".
