@@ -1,3 +1,8 @@
+2013-11-06  Andrew Pinski  <apinski@cavium.com>
+
+	* elfxx-aarch64.c (_bfd_aarch64_elf_grok_prstatus): Correct the size of
+	elf_prstatus.
+
 2013-10-04  Andrew Pinski  <apinski@cavium.com>
 
 	* elfnn-aarch64.c (elfNN_aarch64_allocate_ifunc_dynrelocs):
