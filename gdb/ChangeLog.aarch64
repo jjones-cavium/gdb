@@ -1,3 +1,8 @@
+2013-12-18  Andrew Pinski  <apinski@cavium.com>
+
+	* features/aarch64-core.xml (cpsr): Change to be 64bit.
+	* features/aarch64.c: Regenerate.
+
 2013-12-18  Yufeng Zhang  <yufeng.zhang@arm.com>
 
 	* aarch64-linux-nat.c (aarch64_linux_set_debug_regs): Set
