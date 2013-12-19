@@ -1,3 +1,8 @@
+2013-12-18  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* aarch64-linux-nat.c (aarch64_linux_set_debug_regs): Set
+	iov.iov_len with the real length in use.
+
 2013-10-10  Will Newton  <will.newton@linaro.org>
 
 	* aarch64-linux-tdep.c (aarch64_linux_init_abi): Call
