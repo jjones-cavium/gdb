@@ -1,0 +1,3 @@
+2014-01-15  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* gdb.base/float.exp: Handle "aarch64*-*-*" targets.
