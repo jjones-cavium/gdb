@@ -22,7 +22,7 @@
 volatile long g1 = 0;
 volatile long g0 = 0;
 
-foo (void)
+void foo (void)
 {
   int core_num;
 

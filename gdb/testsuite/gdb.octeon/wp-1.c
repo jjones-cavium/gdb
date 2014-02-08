@@ -1,7 +1,7 @@
 /* Debugger test case to test hardware watchpoints in single core. */
 
 volatile int g1 = 0, g4 = 0;
-static int g2, g3; 	/* Dummy variable to check watchpoint limits.  */
+static int g2, g3 __attribute__((used)); 	/* Dummy variable to check watchpoint limits.  */
 
 static void
 foo (void)

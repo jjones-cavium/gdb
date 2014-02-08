@@ -7,7 +7,6 @@ static void
 foo (void)
 {
   volatile long long *ptr;
-  int i;
 
   struct {
     unsigned char i;
