@@ -23,8 +23,8 @@
 	* testsuite/gdb.octeon/except-bt-2.c: Likewise.
 	* testsuite/gdb.octeon/multicore-pce-2.c: Likewise.
 	* testsuite/gdb.octeon/multicore-wp-1.c: Likewise.
-	* testsuite/gdb.octeon/pce-1.c: Likewise
-	* testsuite/gdb.octeon/wp-1.c: Likewise
+	* testsuite/gdb.octeon/pce-1.c: Likewise.
+	* testsuite/gdb.octeon/wp-1.c: Likewise.
 
 2013-09-08  Andrew Pinski  <apinski@cavium.com>
 
