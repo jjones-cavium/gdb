@@ -1,3 +1,13 @@
+2014-02-07  Andrew Pinski  <apinski@cavium.com>
+
+	* testsuite/gdb.octeon/ctrl-c.c: Fix warnings.
+	* testsuite/gdb.octeon/except-bt-1.c: Likewise.
+	* testsuite/gdb.octeon/except-bt-2.c: Likewise.
+	* testsuite/gdb.octeon/multicore-pce-2.c: Likewise.
+	* testsuite/gdb.octeon/multicore-wp-1.c: Likewise.
+	* testsuite/gdb.octeon/pce-1.c: Likewise
+	* testsuite/gdb.octeon/wp-1.c: Likewise
+
 2013-10-03  Manjunath S Matti  <mmatti@caviumnetworks.com>
 
 	Backported:

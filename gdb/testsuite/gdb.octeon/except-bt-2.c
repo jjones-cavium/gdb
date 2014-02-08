@@ -9,14 +9,13 @@ extern char fault_addr[];
 
 static void octeon_debug_handler(uint64_t registers[32])
 {
-  volatile void *buffer[10];
 
   printf ("In user defined exception handler\n");
   /* Print some useful registers. */
-  printf ("RA = %x, SP = %x\n", registers[31], registers[30]);
+  printf ("RA = %llx, SP = %llx\n", (unsigned long long)registers[31], (unsigned long long) registers[30]);
 }
 
-main ()
+int main (void)
 {
   volatile int x = 100;
   cvmx_user_app_init ();

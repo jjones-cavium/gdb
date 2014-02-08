@@ -10,7 +10,7 @@ void foo (void)
 
 void (*p) (void) = foo;
 
-main ()
+int main (void)
 {
   cvmx_user_app_init ();
   p ();
