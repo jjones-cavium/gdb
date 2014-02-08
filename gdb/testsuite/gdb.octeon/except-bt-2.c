@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <execinfo.h>
+#include <cvmx-interrupt.h>
 
 int *i = 0;
 
@@ -17,7 +18,7 @@ static void octeon_debug_handler(uint64_t registers[32])
 
 int main (void)
 {
-  volatile int x = 100;
+  volatile int x __attribute__((used)) = 100;
   cvmx_user_app_init ();
 
   cvmx_interrupt_set_exception (octeon_debug_handler);

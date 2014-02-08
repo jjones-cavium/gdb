@@ -18,6 +18,10 @@
 
 2014-02-07  Andrew Pinski  <apinski@cavium.com>
 
+	* testsuite/gdb.octeon/except-bt-2.c: Fix some warnings.
+
+2014-02-07  Andrew Pinski  <apinski@cavium.com>
+
 	* testsuite/gdb.octeon/ctrl-c.c: Fix warnings.
 	* testsuite/gdb.octeon/except-bt-1.c: Likewise.
 	* testsuite/gdb.octeon/except-bt-2.c: Likewise.
