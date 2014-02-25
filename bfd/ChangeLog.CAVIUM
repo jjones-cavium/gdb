@@ -1,3 +1,7 @@
+2014-02-25  Praveen Jonnalagadda <pjonnalagadda@caviumnetworks.com>
+
+	* elfxx-mips.c (_bfd_mips_elf_additional_program_headers) : use macro elf_eh_frame_hdr 
+
 2012-08-29  Andrew Pinski  <apinski@cavium.com>
 
 	* archures.c (bfd_mach_mips_octeon3): New define.
