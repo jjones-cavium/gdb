@@ -37,6 +37,7 @@
 
 /* Original to_remote handler.  */
 static void (*remote_resume) (struct target_ops *ops, ptid_t, int, enum gdb_signal);
+void set_resumed_once (void);
 
 /* Count the number of resumes since the last open.  If we just hit
    the debug exception handler after the target command there is no
@@ -64,7 +65,7 @@ struct cmd_list_element *continue_cmd_list_element;
    target.  */
 
 static int
-reopen_p ()
+reopen_p (void)
 {
   if (remote_debug)
     fprintf_unfiltered (gdb_stdlog, "  resumed_once: %d\n", resumed_once);
@@ -102,7 +103,7 @@ generic_remote_create_inferior (struct target_ops *target, char *execfile, char 
      again in target_preopen() if the target is still alive.  */
   if (last_to_shortname
       && strcmp (current_target.to_shortname, last_to_shortname) == 0)
-    pop_target ();
+    unpush_target (target);
 
   /* Don't print the frame where we stop after connecting only the one
      after continue.  */
@@ -119,7 +120,7 @@ generic_remote_create_inferior (struct target_ops *target, char *execfile, char 
 }
 
 void 
-set_resumed_once ()
+set_resumed_once (void)
 {
   resumed_once = 1;
 }
@@ -217,10 +218,9 @@ setup_generic_remote_run (char *args, ptid_t ptid)
     {
       char run_str[] = "run";
       char continue_str[] = "continue";
-      char *p;
+      const char *p = run_str;
       struct cmd_list_element *c;
 
-      p = run_str;
       c = lookup_cmd (&p, cmdlist, "", 0, 1);
       gdb_assert (c);
       gdb_assert (c->type == not_set_cmd);

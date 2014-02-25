@@ -2445,7 +2445,7 @@ static void handle_step_into_function (struct gdbarch *gdbarch,
 				       struct execution_control_state *ecs);
 static void handle_step_into_function_backward (struct gdbarch *gdbarch,
 						struct execution_control_state *ecs);
-static void handle_signal_stop (struct execution_control_state *ecs);
+static void handle_signal_stop (struct execution_control_state *ecs, int old_core_number);
 static void check_exception_resume (struct execution_control_state *,
 				    struct frame_info *);
 
@@ -3763,7 +3763,7 @@ Cannot fill $_exitsignal with the correct signal number.\n"));
       if (debug_infrun)
         fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_STOPPED\n");
       ecs->event_thread->suspend.stop_signal = ecs->ws.value.sig;
-      handle_signal_stop (ecs);
+      handle_signal_stop (ecs, old_core_number);
       return;
 
     case TARGET_WAITKIND_NO_HISTORY:
@@ -3789,7 +3789,7 @@ Cannot fill $_exitsignal with the correct signal number.\n"));
 /* Come here when the program has stopped with a signal.  */
 
 static void
-handle_signal_stop (struct execution_control_state *ecs)
+handle_signal_stop (struct execution_control_state *ecs, int old_core_number)
 {
   struct frame_info *frame;
   struct gdbarch *gdbarch;

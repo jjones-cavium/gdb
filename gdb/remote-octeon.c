@@ -26,7 +26,7 @@
 #include "target.h"
 #include "value.h"
 #include "command.h"
-#include "gdb_string.h"
+#include "string.h"
 #include "exceptions.h"
 #include "gdbcmd.h"
 #include <sys/types.h>
@@ -58,7 +58,7 @@ static void create_connection (void);
 static void simulator_fork (char **);
 static void agent_fork (char **);
 static int gets_octeondebug (char *);
-static void octeon_close (int);
+static void octeon_close (void);
 static void octeon_interrupt (int);
 static void octeon_interrupt_twice (int);
 static void process_core_command (char *, int, struct cmd_list_element *c);
@@ -171,7 +171,7 @@ static int last_wp_p;
 /* Some terminal servers need an intial delay before sending the first
    GDB packet.  This avoids the packet being interpreted as a telnet
    negotiation reply.  */
-static unsigned transmit_delay;
+static int transmit_delay;
 
 /* Record performance counters event per core. */
 static int perf_status_t[MAX_CORES][2];
@@ -558,7 +558,7 @@ create_connection (void)
   if (setjmp (octeon_jmp_buf))
     {
       close_connection ();
-      pop_target ();
+      unpush_target (&octeon_ops);
       perror_with_name ("Quit");
     }
 
@@ -590,7 +590,7 @@ create_connection (void)
 	  serial_close (octeon_desc);
 	  octeon_desc = NULL;
 	}
-      pop_target ();
+      unpush_target (&octeon_ops);
       perror_with_name (serial_port_name);
     }
 
@@ -1088,7 +1088,7 @@ octeon_open_pci (char *name, int from_tty)
 
 /* Close all files and local state before this target loses control. */
 static void
-octeon_close (int quitting)
+octeon_close (void)
 {
   end_status = 0;
 
@@ -1129,9 +1129,9 @@ octeon_interrupt_twice (int signo)
   if (query ("Interrupted while waiting for the program.\n\
 Give up (and stop debugging it)? "))
     {
-      octeon_close (0);
+      octeon_close ();
       target_mourn_inferior ();
-      deprecated_throw_reason (RETURN_QUIT);
+      quit ();
     }
   target_terminal_inferior ();
 
@@ -1384,9 +1384,9 @@ octeon_attach (struct target_ops *ops, char *args, int from_tty)
 /* Terminate the open connection to the remote debugger.  Use this
    when you want to detach and do something else with your gdb.  */
 static void
-octeon_detach (struct target_ops *ops, char *args, int from_tty)
+octeon_detach (struct target_ops *ops, const char *args, int from_tty)
 {
-  pop_target ();		/* calls octeon_close to do the real work */
+  unpush_target (ops);
   if (from_tty)
     printf_unfiltered ("Ending remote %s debugging\n", target_shortname);
 }
@@ -1410,7 +1410,7 @@ octeon_fetch_registers (struct target_ops *ops,
                         struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
-  char reg[MAX_REGISTER_SIZE];
+  gdb_byte reg[MAX_REGISTER_SIZE];
   char *packet = alloca (PBUFSIZ);
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
 
@@ -1454,7 +1454,7 @@ octeon_store_registers (struct target_ops *ops, struct regcache *regcache, int r
    that registers contains all the registers from the program being
    debugged.  */
 static void
-octeon_prepare_to_store (struct regcache *unused)
+octeon_prepare_to_store (struct target_ops *self, struct regcache *unused)
 {
   /* Do nothing, since we can store individual regs */
   (void)unused;
@@ -1535,7 +1535,7 @@ octeon_write_inferior_memory (CORE_ADDR memaddr, unsigned char *data,
    instead of getting it from debug_stub.  Read sizeof(cache_mem_data)
    at a time and do always aligned loads.  */
 static int
-cache_mem_read (CORE_ADDR memaddr, char *myaddr, int len)
+cache_mem_read (CORE_ADDR memaddr, gdb_byte *myaddr, int len)
 {
   if (len > sizeof (cache_mem_data))
     len = sizeof (cache_mem_data);
@@ -1595,7 +1595,7 @@ cache_mem_read (CORE_ADDR memaddr, char *myaddr, int len)
 
    Returns number of bytes transferred, or 0 for error.  */
 static int
-octeon_read_inferior_memory (CORE_ADDR memaddr, char *myaddr, int len)
+octeon_read_inferior_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len)
 {
   int amount_left = len;
   while (amount_left)
@@ -1885,15 +1885,15 @@ octeon_remove_watchpoint (CORE_ADDR addr, int len, int type, struct expression *
    is accomplished via BREAKPOINT_MAX).  */
 
 static int
-octeon_insert_breakpoint (struct gdbarch *gdbarch, struct bp_target_info *bp_tgt)
+octeon_insert_breakpoint (struct target_ops *ops, struct gdbarch *gdbarch, struct bp_target_info *bp_tgt)
 {
-  return memory_insert_breakpoint (gdbarch, bp_tgt);
+  return memory_insert_breakpoint (ops, gdbarch, bp_tgt);
 }
 
 static int
-octeon_remove_breakpoint (struct gdbarch *gdbarch, struct bp_target_info *bp_tgt)
+octeon_remove_breakpoint (struct target_ops *ops, struct gdbarch *gdbarch, struct bp_target_info *bp_tgt)
 {
-  return memory_remove_breakpoint (gdbarch, bp_tgt);
+  return memory_remove_breakpoint (ops, gdbarch, bp_tgt);
 }
 
 static void
@@ -1955,7 +1955,7 @@ process_core_command (char *args, int from_tty,
 
   get_focus ();
   /* Print the frame of the current stack.  */
-  print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC);
+  print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC, 1);
 }
 
 static void

@@ -1,3 +1,21 @@
+2014-02-25  Praveen Jonnalagadda <pjonnalagadda@caviumnetworks.com>
+	* infrun.c (handle_signal_stop): add old_core_number
+	* mips-tdep.(mips_elf_core_read_description): and prototype
+	  (mips_elf_regset_from_core_section): likewise
+	* remote-run.c (reopen_p): Change function declaration
+	  (set_resumed_once): likewise
+	  (generic_remote_create_inferior):replace pop_target () with unpush_target (target)
+	* remote-octeon.c: replace gdb_string.h with string.h
+	  (create_connection):replace pop_target () with unpush_target()
+	  (octeon_close):change argument type
+	  (octeon_detach): likewise
+	  (octeon_interrupt_twice):replace deprecated_throw_reason() with quit()
+	  (octeon_fetch_registers): change char to gdb_byte 
+	  (octeon_prepare_to_store): add argument
+	  (octeon_insert_breakpoint): likewise
+	  (octeon_remove_breakpoint): likewise
+	  (print_stack_frame) :likewise
+
 2013-04-25  Andrew Pinski  <apinski@cavium.com>
 
 	* mips-tdep.c: Include regset.h.

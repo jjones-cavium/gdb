@@ -69,6 +69,11 @@ static int micromips_instruction_has_delay_slot (struct gdbarch *, CORE_ADDR,
 						 int);
 static int mips16_instruction_has_delay_slot (struct gdbarch *, CORE_ADDR,
 					      int);
+const struct target_desc * mips_elf_core_read_description (struct gdbarch *gdbarch,
+				 struct target_ops *target, bfd *abfd);
+
+const struct regset * mips_elf_regset_from_core_section (struct gdbarch *gdbarch,
+			             const char *sect_name, size_t sect_size);
 
 /* A useful bit in the CP0 status register (MIPS_PS_REGNUM).  */
 /* This bit is set if we are emulating 32-bit FPRs on a 64-bit chip.  */
