@@ -2257,14 +2257,14 @@ gnu_detach (struct target_ops *ops, const char *args, int from_tty)
 }
 
 static void
-gnu_terminal_init_inferior (void)
+gnu_terminal_init (struct target_ops *self)
 {
   gdb_assert (gnu_current_inf);
-  terminal_init_inferior_with_pgrp (gnu_current_inf->pid);
+  child_terminal_init_with_pgrp (gnu_current_inf->pid);
 }
 
 static void
-gnu_stop (ptid_t ptid)
+gnu_stop (struct target_ops *self, ptid_t ptid)
 {
   error (_("to_stop target function not implemented"));
 }
@@ -2545,7 +2545,8 @@ gnu_xfer_partial (struct target_ops *ops, enum target_object object,
 
 /* Call FUNC on each memory region in the task.  */
 static int
-gnu_find_memory_regions (find_memory_region_ftype func, void *data)
+gnu_find_memory_regions (struct target_ops *self,
+			 find_memory_region_ftype func, void *data)
 {
   error_t err;
   task_t task;
@@ -2675,7 +2676,7 @@ gnu_target (void)
   t->to_wait = gnu_wait;
   t->to_xfer_partial = gnu_xfer_partial;
   t->to_find_memory_regions = gnu_find_memory_regions;
-  t->to_terminal_init = gnu_terminal_init_inferior;
+  t->to_terminal_init = gnu_terminal_init;
   t->to_kill = gnu_kill_inferior;
   t->to_create_inferior = gnu_create_inferior;
   t->to_mourn_inferior = gnu_mourn_inferior;

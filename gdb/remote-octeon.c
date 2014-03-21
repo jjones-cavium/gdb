@@ -58,7 +58,7 @@ static void create_connection (void);
 static void simulator_fork (char **);
 static void agent_fork (char **);
 static int gets_octeondebug (char *);
-static void octeon_close (void);
+static void octeon_close (struct target_ops*);
 static void octeon_interrupt (int);
 static void octeon_interrupt_twice (int);
 static void process_core_command (char *, int, struct cmd_list_element *c);
@@ -67,7 +67,7 @@ static void show_core_command (struct ui_file *, int,
 static void process_mask_command (char *, int, struct cmd_list_element *c);
 static void process_stepmode_command (char *, int, struct cmd_list_element *c);
 static void process_step_isr_command (char *, int, struct cmd_list_element *c);
-static void octeon_stop (ptid_t ptid);
+static void octeon_stop (struct target_ops *, ptid_t ptid);
 static void get_core_mask (void);
 static int set_focus (int);
 static void get_focus (void);
@@ -1088,7 +1088,7 @@ octeon_open_pci (char *name, int from_tty)
 
 /* Close all files and local state before this target loses control. */
 static void
-octeon_close (void)
+octeon_close (struct target_ops *ops)
 {
   end_status = 0;
 
@@ -1115,7 +1115,7 @@ octeon_interrupt (int signo)
 {
   signal (signo, octeon_interrupt_twice);
   fprintf_unfiltered (gdb_stderr, "Interrupting");
-  octeon_stop (inferior_ptid);
+  octeon_stop (NULL, inferior_ptid);
   octeon_control_c_hit = 1;
 }
 
@@ -1129,7 +1129,7 @@ octeon_interrupt_twice (int signo)
   if (query ("Interrupted while waiting for the program.\n\
 Give up (and stop debugging it)? "))
     {
-      octeon_close ();
+      octeon_close (NULL);
       target_mourn_inferior ();
       quit ();
     }
@@ -1358,7 +1358,7 @@ octeon_wait (struct target_ops *ops, ptid_t ptid,
 }
 
 static int
-octeon_supports_non_stop (void)
+octeon_supports_non_stop (struct target_ops *ops)
 {
   return 0;
 }
@@ -1367,7 +1367,7 @@ octeon_supports_non_stop (void)
    interrupt is requested, either by the command line or the GUI, we
    will eventually end up here. */
 static void
-octeon_stop (ptid_t ptid)
+octeon_stop (struct target_ops * ops, ptid_t ptid)
 {
   /* Send a ^C.  */
   make_and_send_packet ("\003");
@@ -1481,7 +1481,7 @@ octeon_files_info (struct target_ops *ignore)
    Returns number of bytes transferred, or 0 (setting errno) for
    error.  */
 static unsigned int
-octeon_write_inferior_memory (CORE_ADDR memaddr, unsigned char *data,
+octeon_write_inferior_memory (CORE_ADDR memaddr, const gdb_byte *data,
 			      int len)
 {
   long i;
@@ -1612,15 +1612,27 @@ octeon_read_inferior_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len)
 }
 
 /* Read and write memory of and from target respectively. */
-static int
-octeon_xfer_inferior_memory (CORE_ADDR memaddr, gdb_byte * myaddr, int len,
-			     int write, struct mem_attrib *attrib,
-			     struct target_ops *target)
+static enum target_xfer_status
+octeon_xfer_partial (struct target_ops *ops, enum target_object object,
+                      const char *annex, gdb_byte *readbuf,
+                      const gdb_byte *writebuf, ULONGEST offset, ULONGEST len,
+                      ULONGEST *xfered_len)
 {
-  if (write)
-    return octeon_write_inferior_memory (memaddr, myaddr, len);
+  int result;
+  if (object != TARGET_OBJECT_MEMORY)
+    return ops->beneath->to_xfer_partial (ops->beneath, object, annex,
+					  readbuf, writebuf, offset, len,
+					  xfered_len);
+  if (writebuf)
+    result = octeon_write_inferior_memory (offset, writebuf, len);
   else
-    return octeon_read_inferior_memory (memaddr, myaddr, len);
+    result = octeon_read_inferior_memory (offset, readbuf, len);
+  if (result > 0)
+    {
+      *xfered_len = result;
+      return TARGET_XFER_E_IO;
+    }
+  return TARGET_XFER_EOF;
 }
 
 static void
@@ -1633,7 +1645,7 @@ octeon_kill (struct target_ops *target_ops)
 /* At present the simulator is loading the program into memory and executing it
    so no need to do anything. */
 static void
-octeon_load (char *args, int from_tty)
+octeon_load (struct target_ops *ops, char *args, int from_tty)
 {
   /* No need to call generic_load.  While debugging over serial port or over
      tcp, the program is loaded into memory by the bootloader.  */
@@ -1651,20 +1663,20 @@ octeon_mourn_inferior (struct target_ops *unused)
 }
 
 static int
-octeon_multicore_hw_breakpoint (void)
+octeon_multicore_hw_breakpoint (struct target_ops *unused)
 {
   return 1;
 }
 
 static int
-octeon_multicore_hw_watchpoint (void)
+octeon_multicore_hw_watchpoint (struct target_ops *unused)
 {
   return 1;
 }
 
 /* Return 1 if hardware watchpoint is hit, otherwise return 0.  */
 static int
-octeon_stopped_by_watchpoint (void)
+octeon_stopped_by_watchpoint (struct target_ops *self)
 {
   return last_wp_p;
 }
@@ -1674,7 +1686,7 @@ octeon_stopped_by_watchpoint (void)
 static int
 octeon_stopped_data_address (struct target_ops *target, CORE_ADDR *addrp)
 {
-  if (octeon_stopped_by_watchpoint ())
+  if (octeon_stopped_by_watchpoint (target))
     {
       *addrp = last_wp_addr;
       return 1;
@@ -1686,7 +1698,7 @@ octeon_stopped_data_address (struct target_ops *target, CORE_ADDR *addrp)
    value if the value does not cross the max limit (4 for Octeon).  */
 
 static int
-octeon_can_use_watchpoint (int type, int cnt, int othertype)
+octeon_can_use_watchpoint (struct target_ops *ops, int type, int cnt, int othertype)
 {
   int i; 
 
@@ -1699,7 +1711,7 @@ octeon_can_use_watchpoint (int type, int cnt, int othertype)
 }
 
 static int 
-octeon_get_core_number (void)
+octeon_get_core_number (struct target_ops *ops)
 {
   if (remote_debug)
     fprintf_unfiltered (gdb_stderr, "get_core_number: %d\n", octeon_coreid);
@@ -1707,7 +1719,7 @@ octeon_get_core_number (void)
 }
 
 static void
-octeon_set_core_number (int core)
+octeon_set_core_number (struct target_ops *self, int core)
 {
   if (remote_debug)
     fprintf_unfiltered (gdb_stderr, "set_core_number: %d\n", core);
@@ -1719,7 +1731,7 @@ octeon_set_core_number (int core)
    breakpoints that are applied to each core by changing the focus. */
 
 static int
-octeon_insert_mc_hw_breakpoint (struct gdbarch *gdbarch, struct bp_target_info *bp_tgt, int core)
+octeon_insert_mc_hw_breakpoint (struct target_ops *self, struct gdbarch *gdbarch, struct bp_target_info *bp_tgt, int core)
 {
   int i;
   int saved_core = octeon_coreid;
@@ -1747,7 +1759,7 @@ octeon_insert_mc_hw_breakpoint (struct gdbarch *gdbarch, struct bp_target_info *
 
 /* Remove hardware breakpoints. */
 static int
-octeon_remove_mc_hw_breakpoint (struct gdbarch *gdbarch, struct bp_target_info *bp_tgt, int core)
+octeon_remove_mc_hw_breakpoint (struct target_ops *ops, struct gdbarch *gdbarch, struct bp_target_info *bp_tgt, int core)
 {
   int i;
   int saved_core = octeon_coreid;
@@ -1778,13 +1790,13 @@ octeon_remove_mc_hw_breakpoint (struct gdbarch *gdbarch, struct bp_target_info *
 }
 
 static int
-octeon_insert_hw_breakpoint (struct gdbarch *gdbarch, struct bp_target_info *bp_tgt)
+octeon_insert_hw_breakpoint (struct target_ops *ops, struct gdbarch *gdbarch, struct bp_target_info *bp_tgt)
 {
   gdb_assert (0);
 }
 
 static int
-octeon_remove_hw_breakpoint (struct gdbarch *gdbarch, struct bp_target_info *bp_tgt)
+octeon_remove_hw_breakpoint (struct target_ops *ops, struct gdbarch *gdbarch, struct bp_target_info *bp_tgt)
 {
   gdb_assert (0);
 }
@@ -1796,7 +1808,7 @@ octeon_remove_hw_breakpoint (struct gdbarch *gdbarch, struct bp_target_info *bp_
    be treated as software watchpoints.  */
 
 static int
-octeon_insert_mc_watchpoint (CORE_ADDR addr, int len, int type, struct expression *cond, int core)
+octeon_insert_mc_watchpoint (struct target_ops *self, CORE_ADDR addr, int len, int type, struct expression *cond, int core)
 {
   int i;
   int saved_core = octeon_coreid;
@@ -1835,7 +1847,7 @@ octeon_insert_mc_watchpoint (CORE_ADDR addr, int len, int type, struct expressio
 /* Remove hardware watchpoints. */
 
 static int
-octeon_remove_mc_watchpoint (CORE_ADDR addr, int len, int type, struct expression *cond, int core)
+octeon_remove_mc_watchpoint (struct target_ops *self, CORE_ADDR addr, int len, int type, struct expression *cond, int core)
 {
   int i;
   int saved_core = octeon_coreid;
@@ -1865,13 +1877,13 @@ octeon_remove_mc_watchpoint (CORE_ADDR addr, int len, int type, struct expressio
 }
 
 static int
-octeon_insert_watchpoint (CORE_ADDR addr, int len, int type, struct expression *cond)
+octeon_insert_watchpoint (struct target_ops *self, CORE_ADDR addr, int len, int type, struct expression *cond)
 {
   gdb_assert (0);
 }
 
 static int
-octeon_remove_watchpoint (CORE_ADDR addr, int len, int type, struct expression *cond)
+octeon_remove_watchpoint (struct target_ops *self, CORE_ADDR addr, int len, int type, struct expression *cond)
 {
   gdb_assert (0);
 }
@@ -2248,7 +2260,7 @@ show_performance_counter1_event_and_counter (struct ui_file *file, int from_tty,
 /* Forward it to remote-run.  */
 
 static int 
-octeon_can_run (void)
+octeon_can_run (struct target_ops *ops)
 {
   return generic_remote_can_run_target (octeon_ops.to_shortname);
 }
@@ -2257,7 +2269,7 @@ octeon_can_run (void)
    to octeon.  */
 
 static int 
-octeon_can_run_pci (void)
+octeon_can_run_pci (struct target_ops *ops)
 {
   return 0;
 }
@@ -2308,7 +2320,7 @@ Show delay (sec) before trasmitting first packet"),
   octeon_ops.to_fetch_registers = octeon_fetch_registers;
   octeon_ops.to_store_registers = octeon_store_registers;
   octeon_ops.to_prepare_to_store = octeon_prepare_to_store;
-  octeon_ops.deprecated_xfer_memory = octeon_xfer_inferior_memory;
+  octeon_ops.to_xfer_partial = octeon_xfer_partial;
   octeon_ops.to_files_info = octeon_files_info;
   octeon_ops.to_insert_breakpoint = octeon_insert_breakpoint;
   octeon_ops.to_remove_breakpoint = octeon_remove_breakpoint;

@@ -3146,10 +3146,10 @@ static const char *const longjmp_names[] =
 struct breakpoint_objfile_data
 {
   /* Minimal symbol for "_ovly_debug_event" (if any).  */
-  struct minimal_symbol *overlay_msym;
+  struct bound_minimal_symbol overlay_msym;
 
   /* Minimal symbol(s) for "longjmp", "siglongjmp", etc. (if any).  */
-  struct minimal_symbol *longjmp_msym[NUM_LONGJMP_NAMES];
+  struct bound_minimal_symbol longjmp_msym[NUM_LONGJMP_NAMES];
 
   /* True if we have looked for longjmp probes.  */
   int longjmp_searched;
@@ -3158,10 +3158,10 @@ struct breakpoint_objfile_data
   VEC (probe_p) *longjmp_probes;
 
   /* Minimal symbol for "std::terminate()" (if any).  */
-  struct minimal_symbol *terminate_msym;
+  struct bound_minimal_symbol terminate_msym;
 
   /* Minimal symbol for "_Unwind_DebugHook" (if any).  */
-  struct minimal_symbol *exception_msym;
+  struct bound_minimal_symbol exception_msym;
 
   /* True if we have looked for exception probes.  */
   int exception_searched;
@@ -3226,24 +3226,24 @@ create_overlay_event_breakpoint (void)
 
       bp_objfile_data = get_breakpoint_objfile_data (objfile);
 
-      if (msym_not_found_p (bp_objfile_data->overlay_msym))
+      if (msym_not_found_p (bp_objfile_data->overlay_msym.minsym))
 	continue;
 
-      if (bp_objfile_data->overlay_msym == NULL)
+      if (bp_objfile_data->overlay_msym.minsym == NULL)
 	{
-	  struct minimal_symbol *m;
+	  struct bound_minimal_symbol m;
 
 	  m = lookup_minimal_symbol_text (func_name, objfile);
-	  if (m == NULL)
+	  if (m.minsym == NULL)
 	    {
 	      /* Avoid future lookups in this objfile.  */
-	      bp_objfile_data->overlay_msym = &msym_not_found;
+	      bp_objfile_data->overlay_msym.minsym = &msym_not_found;
 	      continue;
 	    }
 	  bp_objfile_data->overlay_msym = m;
 	}
 
-      addr = SYMBOL_VALUE_ADDRESS (bp_objfile_data->overlay_msym);
+      addr = BMSYMBOL_VALUE_ADDRESS (bp_objfile_data->overlay_msym);
       b = create_internal_breakpoint (get_objfile_arch (objfile), addr,
                                       bp_overlay_event,
 				      &internal_breakpoint_ops);
@@ -3323,7 +3323,9 @@ create_longjmp_master_breakpoint (void)
 	    {
 	      struct breakpoint *b;
 
-	      b = create_internal_breakpoint (gdbarch, probe->address,
+	      b = create_internal_breakpoint (gdbarch,
+					      get_probe_address (probe,
+								 objfile),
 					      bp_longjmp_master,
 					      &internal_breakpoint_ops);
 	      b->addr_string = xstrdup ("-probe-stap libc:longjmp");
@@ -3342,25 +3344,25 @@ create_longjmp_master_breakpoint (void)
 	  const char *func_name;
 	  CORE_ADDR addr;
 
-	  if (msym_not_found_p (bp_objfile_data->longjmp_msym[i]))
+	  if (msym_not_found_p (bp_objfile_data->longjmp_msym[i].minsym))
 	    continue;
 
 	  func_name = longjmp_names[i];
-	  if (bp_objfile_data->longjmp_msym[i] == NULL)
+	  if (bp_objfile_data->longjmp_msym[i].minsym == NULL)
 	    {
-	      struct minimal_symbol *m;
+	      struct bound_minimal_symbol m;
 
 	      m = lookup_minimal_symbol_text (func_name, objfile);
-	      if (m == NULL)
+	      if (m.minsym == NULL)
 		{
 		  /* Prevent future lookups in this objfile.  */
-		  bp_objfile_data->longjmp_msym[i] = &msym_not_found;
+		  bp_objfile_data->longjmp_msym[i].minsym = &msym_not_found;
 		  continue;
 		}
 	      bp_objfile_data->longjmp_msym[i] = m;
 	    }
 
-	  addr = SYMBOL_VALUE_ADDRESS (bp_objfile_data->longjmp_msym[i]);
+	  addr = BMSYMBOL_VALUE_ADDRESS (bp_objfile_data->longjmp_msym[i]);
 	  b = create_internal_breakpoint (gdbarch, addr, bp_longjmp_master,
 					  &internal_breakpoint_ops);
 	  b->addr_string = xstrdup (func_name);
@@ -3397,25 +3399,25 @@ create_std_terminate_master_breakpoint (void)
 
       bp_objfile_data = get_breakpoint_objfile_data (objfile);
 
-      if (msym_not_found_p (bp_objfile_data->terminate_msym))
+      if (msym_not_found_p (bp_objfile_data->terminate_msym.minsym))
 	continue;
 
-      if (bp_objfile_data->terminate_msym == NULL)
+      if (bp_objfile_data->terminate_msym.minsym == NULL)
 	{
-	  struct minimal_symbol *m;
+	  struct bound_minimal_symbol m;
 
 	  m = lookup_minimal_symbol (func_name, NULL, objfile);
-	  if (m == NULL || (MSYMBOL_TYPE (m) != mst_text
-			    && MSYMBOL_TYPE (m) != mst_file_text))
+	  if (m.minsym == NULL || (MSYMBOL_TYPE (m.minsym) != mst_text
+				   && MSYMBOL_TYPE (m.minsym) != mst_file_text))
 	    {
 	      /* Prevent future lookups in this objfile.  */
-	      bp_objfile_data->terminate_msym = &msym_not_found;
+	      bp_objfile_data->terminate_msym.minsym = &msym_not_found;
 	      continue;
 	    }
 	  bp_objfile_data->terminate_msym = m;
 	}
 
-      addr = SYMBOL_VALUE_ADDRESS (bp_objfile_data->terminate_msym);
+      addr = BMSYMBOL_VALUE_ADDRESS (bp_objfile_data->terminate_msym);
       b = create_internal_breakpoint (get_objfile_arch (objfile), addr,
                                       bp_std_terminate_master,
 				      &internal_breakpoint_ops);
@@ -3484,7 +3486,9 @@ create_exception_master_breakpoint (void)
 	    {
 	      struct breakpoint *b;
 
-	      b = create_internal_breakpoint (gdbarch, probe->address,
+	      b = create_internal_breakpoint (gdbarch,
+					      get_probe_address (probe,
+								 objfile),
 					      bp_exception_master,
 					      &internal_breakpoint_ops);
 	      b->addr_string = xstrdup ("-probe-stap libgcc:unwind");
@@ -3496,26 +3500,26 @@ create_exception_master_breakpoint (void)
 
       /* Otherwise, try the hook function.  */
 
-      if (msym_not_found_p (bp_objfile_data->exception_msym))
+      if (msym_not_found_p (bp_objfile_data->exception_msym.minsym))
 	continue;
 
       gdbarch = get_objfile_arch (objfile);
 
-      if (bp_objfile_data->exception_msym == NULL)
+      if (bp_objfile_data->exception_msym.minsym == NULL)
 	{
-	  struct minimal_symbol *debug_hook;
+	  struct bound_minimal_symbol debug_hook;
 
 	  debug_hook = lookup_minimal_symbol (func_name, NULL, objfile);
-	  if (debug_hook == NULL)
+	  if (debug_hook.minsym == NULL)
 	    {
-	      bp_objfile_data->exception_msym = &msym_not_found;
+	      bp_objfile_data->exception_msym.minsym = &msym_not_found;
 	      continue;
 	    }
 
 	  bp_objfile_data->exception_msym = debug_hook;
 	}
 
-      addr = SYMBOL_VALUE_ADDRESS (bp_objfile_data->exception_msym);
+      addr = BMSYMBOL_VALUE_ADDRESS (bp_objfile_data->exception_msym);
       addr = gdbarch_convert_from_func_ptr_addr (gdbarch, addr,
 						 &current_target);
       b = create_internal_breakpoint (gdbarch, addr, bp_exception_master,
@@ -5164,7 +5168,6 @@ bpstat_check_watchpoint (bpstat bs)
 static void
 bpstat_check_breakpoint_conditions (bpstat bs, ptid_t ptid)
 {
-  int thread_id = pid_to_thread_id (ptid);
   const struct bp_location *bl;
   struct breakpoint *b;
   int value_is_zero = 0;
@@ -5189,9 +5192,12 @@ bpstat_check_breakpoint_conditions (bpstat bs, ptid_t ptid)
       return;
     }
 
-  /* If this is a thread-specific breakpoint, don't waste cpu evaluating the
-     condition if this isn't the specified thread.  */
-  if (b->thread != -1 && b->thread != thread_id)
+  /* If this is a thread/task-specific breakpoint, don't waste cpu
+     evaluating the condition if this isn't the specified
+     thread/task.  */
+  if ((b->thread != -1 && b->thread != pid_to_thread_id (ptid))
+      || (b->task != 0 && b->task != ada_get_task_number (ptid)))
+
     {
       bs->stop = 0;
       return;
@@ -9047,7 +9053,8 @@ add_location_to_breakpoint (struct breakpoint *b,
   loc->requested_address = sal->pc;
   loc->address = adjusted_address;
   loc->pspace = sal->pspace;
-  loc->probe = sal->probe;
+  loc->probe.probe = sal->probe;
+  loc->probe.objfile = sal->objfile;
   gdb_assert (loc->pspace != NULL);
   loc->section = sal->section;
   loc->gdbarch = loc_gdbarch;
@@ -10025,7 +10032,7 @@ resolve_sal_pc (struct symtab_and_line *sal)
 
 	      msym = lookup_minimal_symbol_by_pc (sal->pc);
 	      if (msym.minsym)
-		sal->section = SYMBOL_OBJ_SECTION (msym.objfile, msym.minsym);
+		sal->section = MSYMBOL_OBJ_SECTION (msym.objfile, msym.minsym);
 
 	      do_cleanups (old_chain);
 	    }
@@ -13392,7 +13399,9 @@ bkpt_probe_insert_location (struct bp_location *bl)
     {
       /* The insertion was successful, now let's set the probe's semaphore
 	 if needed.  */
-      bl->probe->pops->set_semaphore (bl->probe, bl->gdbarch);
+      bl->probe.probe->pops->set_semaphore (bl->probe.probe,
+					    bl->probe.objfile,
+					    bl->gdbarch);
     }
 
   return v;
@@ -13402,7 +13411,9 @@ static int
 bkpt_probe_remove_location (struct bp_location *bl)
 {
   /* Let's clear the semaphore before removing the location.  */
-  bl->probe->pops->clear_semaphore (bl->probe, bl->gdbarch);
+  bl->probe.probe->pops->clear_semaphore (bl->probe.probe,
+					  bl->probe.objfile,
+					  bl->gdbarch);
 
   return bkpt_remove_location (bl);
 }
@@ -15575,7 +15586,7 @@ trace_pass_command (char *args, int from_tty)
     }
   else if (*args == '\0')
     {
-      t1 = get_tracepoint_by_number (&args, NULL, 1);
+      t1 = get_tracepoint_by_number (&args, NULL);
       if (t1)
 	trace_pass_set_count (t1, count, from_tty);
     }
@@ -15586,7 +15597,7 @@ trace_pass_command (char *args, int from_tty)
       init_number_or_range (&state, args);
       while (!state.finished)
 	{
-	  t1 = get_tracepoint_by_number (&args, &state, 1);
+	  t1 = get_tracepoint_by_number (&args, &state);
 	  if (t1)
 	    trace_pass_set_count (t1, count, from_tty);
 	}
@@ -15627,12 +15638,12 @@ get_tracepoint_by_number_on_target (int num)
 
 /* Utility: parse a tracepoint number and look it up in the list.
    If STATE is not NULL, use, get_number_or_range_state and ignore ARG.
-   If OPTIONAL_P is true, then if the argument is missing, the most
-   recent tracepoint (tracepoint_count) is returned.  */
+   If the argument is missing, the most recent tracepoint
+   (tracepoint_count) is returned.  */
+
 struct tracepoint *
 get_tracepoint_by_number (char **arg,
-			  struct get_number_or_range_state *state,
-			  int optional_p)
+			  struct get_number_or_range_state *state)
 {
   struct breakpoint *t;
   int tpnum;
@@ -15644,12 +15655,7 @@ get_tracepoint_by_number (char **arg,
       tpnum = get_number_or_range (state);
     }
   else if (arg == NULL || *arg == NULL || ! **arg)
-    {
-      if (optional_p)
-	tpnum = tracepoint_count;
-      else
-	error_no_arg (_("tracepoint number"));
-    }
+    tpnum = tracepoint_count;
   else
     tpnum = get_number (arg);
 
@@ -15659,8 +15665,7 @@ get_tracepoint_by_number (char **arg,
 	printf_filtered (_("bad tracepoint number at or near '%s'\n"), 
 			 instring);
       else
-	printf_filtered (_("Tracepoint argument missing "
-			   "and no previous tracepoint\n"));
+	printf_filtered (_("No previous tracepoint\n"));
       return NULL;
     }
 

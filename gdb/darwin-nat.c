@@ -87,7 +87,7 @@
 
 extern boolean_t exc_server (mach_msg_header_t *in, mach_msg_header_t *out);
 
-static void darwin_stop (ptid_t);
+static void darwin_stop (struct target_ops *self, ptid_t);
 
 static void darwin_resume_to (struct target_ops *ops, ptid_t ptid, int step,
                               enum gdb_signal signal);
@@ -1144,7 +1144,7 @@ darwin_wait_to (struct target_ops *ops,
 }
 
 static void
-darwin_stop (ptid_t t)
+darwin_stop (struct target_ops *self, ptid_t t)
 {
   struct inferior *inf = current_inferior ();
 
@@ -1919,7 +1919,7 @@ darwin_read_dyld_info (task_t task, CORE_ADDR addr, gdb_byte *rdaddr,
 
 
 
-static LONGEST
+static enum target_xfer_status
 darwin_xfer_partial (struct target_ops *ops,
 		     enum target_object object, const char *annex,
 		     gdb_byte *readbuf, const gdb_byte *writebuf,
@@ -1989,7 +1989,7 @@ set_enable_mach_exceptions (char *args, int from_tty,
 }
 
 static char *
-darwin_pid_to_exec_file (int pid)
+darwin_pid_to_exec_file (struct target_ops *self, int pid)
 {
   char *path;
   int res;
@@ -2005,7 +2005,7 @@ darwin_pid_to_exec_file (int pid)
 }
 
 static ptid_t
-darwin_get_ada_task_ptid (long lwp, long thread)
+darwin_get_ada_task_ptid (struct target_ops *self, long lwp, long thread)
 {
   int i;
   darwin_thread_t *t;
@@ -2072,7 +2072,7 @@ darwin_get_ada_task_ptid (long lwp, long thread)
 }
 
 static int
-darwin_supports_multi_process (void)
+darwin_supports_multi_process (struct target_ops *self)
 {
   return 1;
 }

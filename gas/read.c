@@ -1,5 +1,5 @@
 /* read.c - read a source file -
-   Copyright 1986-2013 Free Software Foundation, Inc.
+   Copyright (C) 1986-2014 Free Software Foundation, Inc.
 
    This file is part of GAS, the GNU Assembler.
 
@@ -263,8 +263,11 @@ read_begin (void)
   obstack_begin (&notes, chunksize);
   obstack_begin (&cond_obstack, chunksize);
 
+#ifndef tc_line_separator_chars
+#define tc_line_separator_chars line_separator_chars
+#endif
   /* Use machine dependent syntax.  */
-  for (p = line_separator_chars; *p; p++)
+  for (p = tc_line_separator_chars; *p; p++)
     is_end_of_line[(unsigned char) *p] = 2;
   /* Use more.  FIXME-SOMEDAY.  */
 

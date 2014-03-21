@@ -887,7 +887,7 @@ sim_close (SIM_DESC sd, int quitting)
 }
 
 SIM_RC
-sim_load (SIM_DESC sd, char *prog, bfd *abfd, int from_tty)
+sim_load (SIM_DESC sd, const char *prog, bfd *abfd, int from_tty)
 {
   /* Do the right thing for ELF executables; this turns out to be
      just about the right thing for any object format that:
@@ -1006,7 +1006,7 @@ sim_kill (SIM_DESC sd)
 }
 
 void
-sim_do_command (SIM_DESC sd, char * cmd)
+sim_do_command (SIM_DESC sd, const char *cmd)
 {
   /* Nothing there yet; it's all an error.  */
 

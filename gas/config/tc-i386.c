@@ -1,8 +1,5 @@
 /* tc-i386.c -- Assemble code for the Intel 80386
-   Copyright 1989, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
-   2012, 2013, 2014
-   Free Software Foundation, Inc.
+   Copyright (C) 1989-2014 Free Software Foundation, Inc.
 
    This file is part of GAS, the GNU Assembler.
 
@@ -516,6 +513,11 @@ enum x86_elf_abi
 static enum x86_elf_abi x86_elf_abi = I386_ABI;
 #endif
 
+#if defined (TE_PE) || defined (TE_PEP)
+/* Use big object file format.  */
+static int use_big_obj = 0;
+#endif
+
 /* 1 for intel syntax,
    0 if att syntax.  */
 static int intel_syntax = 0;
@@ -910,6 +912,8 @@ static const arch_entry cpu_arch[] =
     CPU_XSAVEC_FLAGS, 0, 0 },
   { STRING_COMMA_LEN (".xsaves"), PROCESSOR_UNKNOWN,
     CPU_XSAVES_FLAGS, 0, 0 },
+  { STRING_COMMA_LEN (".prefetchwt1"), PROCESSOR_UNKNOWN,
+    CPU_PREFETCHWT1_FLAGS, 0, 0 },
 };
 
 #ifdef I386COFF
@@ -9498,6 +9502,7 @@ const char *md_shortopts = "qn";
 #define OPTION_MADD_BND_PREFIX (OPTION_MD_BASE + 15)
 #define OPTION_MEVEXLIG (OPTION_MD_BASE + 16)
 #define OPTION_MEVEXWIG (OPTION_MD_BASE + 17)
+#define OPTION_MBIG_OBJ (OPTION_MD_BASE + 18)
 
 struct option md_longopts[] =
 {
@@ -9524,6 +9529,9 @@ struct option md_longopts[] =
   {"madd-bnd-prefix", no_argument, NULL, OPTION_MADD_BND_PREFIX},
   {"mevexlig", required_argument, NULL, OPTION_MEVEXLIG},
   {"mevexwig", required_argument, NULL, OPTION_MEVEXWIG},
+# if defined (TE_PE) || defined (TE_PEP)
+  {"mbig-obj", no_argument, NULL, OPTION_MBIG_OBJ},
+#endif
   {NULL, no_argument, NULL, 0}
 };
 size_t md_longopts_size = sizeof (md_longopts);
@@ -9805,6 +9813,12 @@ md_parse_option (int c, char *arg)
 	as_fatal (_("invalid -mevexwig= option: `%s'"), arg);
       break;
 
+# if defined (TE_PE) || defined (TE_PEP)
+    case OPTION_MBIG_OBJ:
+      use_big_obj = 1;
+      break;
+#endif
+
     default:
       return 0;
     }
@@ -9957,6 +9971,10 @@ md_show_usage (FILE *stream)
   -mold-gcc               support old (<= 2.8.1) versions of gcc\n"));
   fprintf (stream, _("\
   -madd-bnd-prefix        add BND prefix for all valid branches\n"));
+# if defined (TE_PE) || defined (TE_PEP)
+  fprintf (stream, _("\
+  -mbig-obj               generate big object files\n"));
+#endif
 }
 
 #if ((defined (OBJ_MAYBE_COFF) && defined (OBJ_MAYBE_AOUT)) \
@@ -9995,7 +10013,10 @@ i386_target_format (void)
 #if defined (OBJ_MAYBE_COFF) || defined (OBJ_COFF)
 # if defined (TE_PE) || defined (TE_PEP)
     case bfd_target_coff_flavour:
-      return flag_code == CODE_64BIT ? "pe-x86-64" : "pe-i386";
+      if (flag_code == CODE_64BIT)
+	return use_big_obj ? "pe-bigobj-x86-64" : "pe-x86-64";
+      else
+	return "pe-i386";
 # elif defined (TE_GO32)
     case bfd_target_coff_flavour:
       return "coff-go32";
