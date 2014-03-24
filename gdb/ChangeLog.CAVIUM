@@ -1,4 +1,10 @@
+2014-03-23  Andrew Pinski <apinski@cavium.com>
+
+	* remote-octeon.c (return_zero): New function.
+	(init_octeon_ops): Set to_can_async_p to return_zero.
+
 2014-02-25  Praveen Jonnalagadda <pjonnalagadda@caviumnetworks.com>
+
 	* infrun.c (handle_signal_stop): add old_core_number
 	* mips-tdep.(mips_elf_core_read_description): and prototype
 	  (mips_elf_regset_from_core_section): likewise

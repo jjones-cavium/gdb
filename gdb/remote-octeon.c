@@ -1,6 +1,6 @@
 /* Remote protocol for Octeon Simple Executive cross debugger. 
 
-   Copyright (C) 2004, 2005, 2006 Cavium Networks.
+   Copyright (C) 2004-2014 Cavium Networks.
 
    This file is part of GDB.
 
@@ -2274,6 +2274,12 @@ octeon_can_run_pci (struct target_ops *ops)
   return 0;
 }
 
+static int
+return_zero (struct target_ops *ignore)
+{
+  return 0;
+}
+
 static void
 init_octeon_ops (void)
 {
@@ -2345,6 +2351,7 @@ Show delay (sec) before trasmitting first packet"),
   octeon_ops.to_kill = octeon_kill;
   octeon_ops.to_load = octeon_load;
   octeon_ops.to_can_run = octeon_can_run;
+  octeon_ops.to_can_async_p = return_zero;
   octeon_ops.to_mourn_inferior = octeon_mourn_inferior;
   octeon_ops.to_stop = octeon_stop;
   octeon_ops.to_stratum = process_stratum;
