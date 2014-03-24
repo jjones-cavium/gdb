@@ -1630,7 +1630,7 @@ octeon_xfer_partial (struct target_ops *ops, enum target_object object,
   if (result > 0)
     {
       *xfered_len = result;
-      return TARGET_XFER_E_IO;
+      return TARGET_XFER_OK;
     }
   return TARGET_XFER_EOF;
 }
