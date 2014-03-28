@@ -3600,7 +3600,8 @@ elfNN_aarch64_final_link_relocate (reloc_howto_type *howto,
 
 	      if (globals->root.splt != NULL)
 		{
-		  plt_index = h->plt.offset / globals->plt_entry_size - 1;
+		  plt_index = ((h->plt.offset - globals->plt_header_size) /
+			       globals->plt_entry_size);
 		  off = (plt_index + 3) * GOT_ENTRY_SIZE;
 		  base_got = globals->root.sgotplt;
 		}
@@ -6674,7 +6675,7 @@ elfNN_aarch64_create_small_pltn_entry (struct elf_link_hash_entry *h,
 
   plt_entry = plt->contents + h->plt.offset;
   plt_entry_address = plt->output_section->vma
-    + plt->output_section->output_offset + h->plt.offset;
+    + plt->output_offset + h->plt.offset;
   gotplt_entry_address = gotplt->output_section->vma +
     gotplt->output_offset + got_offset;
 
@@ -6846,7 +6847,34 @@ elfNN_aarch64_finish_dynamic_symbol (bfd *output_bfd,
 		       + htab->root.sgot->output_offset
 		       + (h->got.offset & ~(bfd_vma) 1));
 
-      if (info->shared && SYMBOL_REFERENCES_LOCAL (info, h))
+      if (h->def_regular
+	  && h->type == STT_GNU_IFUNC)
+	{
+	  if (info->shared)
+	    {
+	      /* Generate R_AARCH64_GLOB_DAT.  */
+	      goto do_glob_dat;
+	    }
+	  else
+	    {
+	      asection *plt;
+
+	      if (!h->pointer_equality_needed)
+		abort ();
+
+	      /* For non-shared object, we can't use .got.plt, which
+		 contains the real function address if we need pointer
+		 equality.  We load the GOT entry with the PLT entry.  */
+	      plt = htab->root.splt ? htab->root.splt : htab->root.iplt;
+	      bfd_put_NN (output_bfd, (plt->output_section->vma
+				       + plt->output_offset
+				       + h->plt.offset),
+			  htab->root.sgot->contents
+			  + (h->got.offset & ~(bfd_vma) 1));
+	      return TRUE;
+	    }
+	}
+      else if (info->shared && SYMBOL_REFERENCES_LOCAL (info, h))
 	{
 	  if (!h->def_regular)
 	    return FALSE;
@@ -6859,6 +6887,7 @@ elfNN_aarch64_finish_dynamic_symbol (bfd *output_bfd,
 	}
       else
 	{
+do_glob_dat:
 	  BFD_ASSERT ((h->got.offset & 1) == 0);
 	  bfd_put_NN (output_bfd, (bfd_vma) 0,
 		      htab->root.sgot->contents + h->got.offset);
