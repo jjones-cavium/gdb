@@ -801,7 +801,7 @@ ps_get_thread_area (const struct ps_prochandle *ph,
   /* IDX is the bias from the thread pointer to the beginning of the
      thread descriptor.  It has to be subtracted due to implementation
      quirks in libthread_db.  */
-  *base = (void *) (reg - idx);
+  *base = (void *)(size_t) (reg - idx);
 
   return PS_OK;
 }

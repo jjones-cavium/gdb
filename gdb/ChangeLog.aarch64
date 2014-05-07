@@ -1,3 +1,8 @@
+2014-05-06  Andrew Pinski  <apinski@cavium.com>
+
+	* aarch64-linux-nat.c: Fix warnings with ILP32.
+	* linux-aarch64-low.c: Likewise.
+
 2013-12-28  Sergio Durigan Junior  <sergiodj@redhat.com>
 
 	PR tdep/15653
