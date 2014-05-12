@@ -222,6 +222,12 @@ void set_step_info (struct frame_info *frame, struct symtab_and_line sal);
 
 extern void clear_exit_convenience_vars (void);
 
+/* Returns true if we're trying to step past the instruction at
+   ADDRESS in ASPACE.  */
+
+extern int stepping_past_instruction_at (struct address_space *aspace,
+					 CORE_ADDR address);
+
 /* From infcmd.c */
 
 extern void post_create_inferior (struct target_ops *, int);
@@ -299,20 +305,20 @@ enum step_over_calls_kind
    setting up a remote connection; it is like STOP_QUIETLY_NO_SIGSTOP
    except that there is no need to hide a signal.  */
 
-/* It is also used after attach, due to attaching to a process.  This
-   is a bit trickier.  When doing an attach, the kernel stops the
-   debuggee with a SIGSTOP.  On newer GNU/Linux kernels (>= 2.5.61)
-   the handling of SIGSTOP for a ptraced process has changed.  Earlier
-   versions of the kernel would ignore these SIGSTOPs, while now
-   SIGSTOP is treated like any other signal, i.e. it is not muffled.
-   
+/* STOP_QUIETLY_NO_SIGSTOP is used to handle a tricky situation with attach.
+   When doing an attach, the kernel stops the debuggee with a SIGSTOP.
+   On newer GNU/Linux kernels (>= 2.5.61) the handling of SIGSTOP for
+   a ptraced process has changed.  Earlier versions of the kernel
+   would ignore these SIGSTOPs, while now SIGSTOP is treated like any
+   other signal, i.e. it is not muffled.
+
    If the gdb user does a 'continue' after the 'attach', gdb passes
    the global variable stop_signal (which stores the signal from the
    attach, SIGSTOP) to the ptrace(PTRACE_CONT,...)  call.  This is
    problematic, because the kernel doesn't ignore such SIGSTOP
    now.  I.e. it is reported back to gdb, which in turn presents it
    back to the user.
- 
+
    To avoid the problem, we use STOP_QUIETLY_NO_SIGSTOP, which allows
    gdb to clear the value of stop_signal after the attach, so that it
    is not passed back down to the kernel.  */
