@@ -1,3 +1,7 @@
+2014-05-22  Ramana Radhakrishnan  <ramana.radhakrishnan@arm.com>
+
+	* aarch64-linux-nat.c (asm/ptrace.h): Include.
+
 2014-05-20  Hui Zhu  <hui@codesourcery.com>
 	    Yao Qi  <yao@codesourcery.com>
 
