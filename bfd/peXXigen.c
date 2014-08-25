@@ -1112,7 +1112,7 @@ _bfd_XXi_slurp_codeview_record (bfd * abfd, file_ptr where, unsigned long length
   if (bfd_bread (buffer, 256, abfd) < 4)
     return NULL;
 
-  /* ensure null termination of filename */
+  /* Ensure null termination of filename.  */
   buffer[256] = '\0';
 
   cvinfo->CVSignature = H_GET_32(abfd, buffer);
@@ -1124,7 +1124,15 @@ _bfd_XXi_slurp_codeview_record (bfd * abfd, file_ptr where, unsigned long length
       CV_INFO_PDB70 *cvinfo70 = (CV_INFO_PDB70 *)(buffer);
 
       cvinfo->Age = H_GET_32(abfd, cvinfo70->Age);
-      memcpy (cvinfo->Signature, cvinfo70->Signature, CV_INFO_SIGNATURE_LENGTH);
+
+      /* A GUID consists of 4,2,2 byte values in little-endian order, followed
+         by 8 single bytes.  Byte swap them so we can conveniently treat the GUID
+         as 16 bytes in big-endian order.  */
+      bfd_putb32 (bfd_getl32 (cvinfo70->Signature), cvinfo->Signature);
+      bfd_putb16 (bfd_getl16 (&(cvinfo70->Signature[4])), &(cvinfo->Signature[4]));
+      bfd_putb16 (bfd_getl16 (&(cvinfo70->Signature[6])), &(cvinfo->Signature[6]));
+      memcpy (&(cvinfo->Signature[8]), &(cvinfo70->Signature[8]), 8);
+
       cvinfo->SignatureLength = CV_INFO_SIGNATURE_LENGTH;
       // cvinfo->PdbFileName = cvinfo70->PdbFileName;
 
@@ -1157,7 +1165,14 @@ _bfd_XXi_write_codeview_record (bfd * abfd, file_ptr where, CODEVIEW_INFO *cvinf
 
   cvinfo70 = (CV_INFO_PDB70 *) buffer;
   H_PUT_32 (abfd, CVINFO_PDB70_CVSIGNATURE, cvinfo70->CvSignature);
-  memcpy (&(cvinfo70->Signature), cvinfo->Signature, CV_INFO_SIGNATURE_LENGTH);
+
+  /* Byte swap the GUID from 16 bytes in big-endian order to 4,2,2 byte values
+     in little-endian order, followed by 8 single bytes.  */
+  bfd_putl32 (bfd_getb32 (cvinfo->Signature), cvinfo70->Signature);
+  bfd_putl16 (bfd_getb16 (&(cvinfo->Signature[4])), &(cvinfo70->Signature[4]));
+  bfd_putl16 (bfd_getb16 (&(cvinfo->Signature[6])), &(cvinfo70->Signature[6]));
+  memcpy (&(cvinfo70->Signature[8]), &(cvinfo->Signature[8]), 8);
+
   H_PUT_32 (abfd, cvinfo->Age, cvinfo70->Age);
   cvinfo70->PdbFileName[0] = '\0';
 
@@ -2077,8 +2092,7 @@ pe_print_reloc (bfd * abfd, void * vfile)
   FILE *file = (FILE *) vfile;
   bfd_byte *data = 0;
   asection *section = bfd_get_section_by_name (abfd, ".reloc");
-  bfd_size_type i;
-  bfd_size_type start, stop;
+  bfd_byte *p, *end;
 
   if (section == NULL || section->size == 0 || !(section->flags & SEC_HAS_CONTENTS))
     return TRUE;
@@ -2093,20 +2107,20 @@ pe_print_reloc (bfd * abfd, void * vfile)
       return FALSE;
     }
 
-  start = 0;
-
-  stop = section->size;
-
-  for (i = start; i < stop;)
+  p = data;
+  end = data + section->size;
+  while (p + 8 <= end)
     {
       int j;
       bfd_vma virtual_address;
       long number, size;
+      bfd_byte *chunk_end;
 
       /* The .reloc section is a sequence of blocks, with a header consisting
 	 of two 32 bit quantities, followed by a number of 16 bit entries.  */
-      virtual_address = bfd_get_32 (abfd, data+i);
-      size = bfd_get_32 (abfd, data+i+4);
+      virtual_address = bfd_get_32 (abfd, p);
+      size = bfd_get_32 (abfd, p + 4);
+      p += 8;
       number = (size - 8) / 2;
 
       if (size == 0)
@@ -2116,9 +2130,13 @@ pe_print_reloc (bfd * abfd, void * vfile)
 	       _("\nVirtual Address: %08lx Chunk size %ld (0x%lx) Number of fixups %ld\n"),
 	       (unsigned long) virtual_address, size, (unsigned long) size, number);
 
-      for (j = 0; j < number; ++j)
+      chunk_end = p + size;
+      if (chunk_end > end)
+	chunk_end = end;
+      j = 0;
+      while (p + 2 <= chunk_end)
 	{
-	  unsigned short e = bfd_get_16 (abfd, data + i + 8 + j * 2);
+	  unsigned short e = bfd_get_16 (abfd, p);
 	  unsigned int t = (e & 0xF000) >> 12;
 	  int off = e & 0x0FFF;
 
@@ -2129,20 +2147,20 @@ pe_print_reloc (bfd * abfd, void * vfile)
 		   _("\treloc %4d offset %4x [%4lx] %s"),
 		   j, off, (unsigned long) (off + virtual_address), tbl[t]);
 
+	  p += 2;
+	  j++;
+
 	  /* HIGHADJ takes an argument, - the next record *is* the
 	     low 16 bits of addend.  */
-	  if (t == IMAGE_REL_BASED_HIGHADJ)
+	  if (t == IMAGE_REL_BASED_HIGHADJ && p + 2 <= chunk_end)
 	    {
-	      fprintf (file, " (%4x)",
-		       ((unsigned int)
-			bfd_get_16 (abfd, data + i + 8 + j * 2 + 2)));
+	      fprintf (file, " (%4x)", (unsigned int) bfd_get_16 (abfd, p));
+	      p += 2;
 	      j++;
 	    }
 
 	  fprintf (file, "\n");
 	}
-
-      i += size;
     }
 
   free (data);
@@ -2383,7 +2401,16 @@ rsrc_print_section (bfd * abfd, void * vfile)
 	  if (data == (regions.section_end - 4))
 	    data = regions.section_end;
 	  else if (data < regions.section_end)
-	    fprintf (file, _("\nWARNING: Extra data in .rsrc section - it will be ignored by Windows:\n"));
+	    {
+	      /* If the extra data is all zeros then do not complain.
+		 This is just padding so that the section meets the
+		 page size requirements.  */
+	      while (data ++ < regions.section_end)
+		if (*data != 0)
+		  break;
+	      if (data < regions.section_end)
+		fprintf (file, _("\nWARNING: Extra data in .rsrc section - it will be ignored by Windows:\n"));
+	    }
 	}
     }
 
@@ -2444,6 +2471,13 @@ pe_print_debugdata (bfd * abfd, void * vfile)
     {
       fprintf (file,
                _("\nThere is a debug directory, but the section containing it could not be found\n"));
+      return TRUE;
+    }
+  else if (!(section->flags & SEC_HAS_CONTENTS))
+    {
+      fprintf (file,
+               _("\nThere is a debug directory in %s, but that section has no contents\n"),
+               section->name);
       return TRUE;
     }
 
@@ -2689,6 +2723,19 @@ _bfd_XX_print_private_bfd_data_common (bfd * abfd, void * vfile)
   return TRUE;
 }
 
+static bfd_boolean
+is_vma_in_section (bfd *abfd ATTRIBUTE_UNUSED, asection *sect, void *obj)
+{
+  bfd_vma addr = * (bfd_vma *) obj;
+  return (addr >= sect->vma) && (addr < (sect->vma + sect->size));
+}
+
+static asection *
+find_section_by_vma (bfd *abfd, bfd_vma addr)
+{
+  return bfd_sections_find_if (abfd, is_vma_in_section, (void *) & addr);
+}
+
 /* Copy any private info we understand from the input bfd
    to the output bfd.  */
 
@@ -2726,6 +2773,47 @@ _bfd_XX_bfd_copy_private_bfd_data_common (bfd * ibfd, bfd * obfd)
   if (! pe_data (ibfd)->has_reloc_section
       && ! (pe_data (ibfd)->real_flags & IMAGE_FILE_RELOCS_STRIPPED))
     pe_data (obfd)->dont_strip_reloc = 1;
+
+  /* The file offsets contained in the debug directory need rewriting.  */
+  if (ope->pe_opthdr.DataDirectory[PE_DEBUG_DATA].Size != 0)
+    {
+      bfd_vma addr = ope->pe_opthdr.DataDirectory[PE_DEBUG_DATA].VirtualAddress
+	+ ope->pe_opthdr.ImageBase;
+      asection *section = find_section_by_vma (obfd, addr);
+      bfd_byte *data;
+
+      if (section && bfd_malloc_and_get_section (obfd, section, &data))
+        {
+          unsigned int i;
+          struct external_IMAGE_DEBUG_DIRECTORY *dd =
+	    (struct external_IMAGE_DEBUG_DIRECTORY *)(data + (addr - section->vma));
+
+          for (i = 0; i < ope->pe_opthdr.DataDirectory[PE_DEBUG_DATA].Size
+		 / sizeof (struct external_IMAGE_DEBUG_DIRECTORY); i++)
+            {
+              asection *ddsection;
+              struct external_IMAGE_DEBUG_DIRECTORY *edd = &(dd[i]);
+              struct internal_IMAGE_DEBUG_DIRECTORY idd;
+
+              _bfd_XXi_swap_debugdir_in (obfd, edd, &idd);
+
+              if (idd.AddressOfRawData == 0)
+                continue; /* RVA 0 means only offset is valid, not handled yet.  */
+
+              ddsection = find_section_by_vma (obfd, idd.AddressOfRawData + ope->pe_opthdr.ImageBase);
+              if (!ddsection)
+                continue; /* Not in a section! */
+
+              idd.PointerToRawData = ddsection->filepos + (idd.AddressOfRawData
+							   + ope->pe_opthdr.ImageBase) - ddsection->vma;
+
+              _bfd_XXi_swap_debugdir_out (obfd, &idd, edd);
+            }
+
+          if (!bfd_set_section_contents (obfd, section, data, 0, section->size))
+            _bfd_error_handler (_("Failed to update file offsets in debug directory"));
+        }
+    }
 
   return TRUE;
 }
@@ -3835,6 +3923,7 @@ rsrc_process_section (bfd * abfd,
   data = bfd_malloc (size);
   if (data == NULL)
     return;
+
   datastart = data;
 
   if (! bfd_get_section_contents (abfd, sec, data, 0, size))
@@ -3855,7 +3944,7 @@ rsrc_process_section (bfd * abfd,
 
   for (input = pfinfo->info->input_bfds;
        input != NULL;
-       input = input->link_next)
+       input = input->link.next)
     {
       asection * rsrc_sec = bfd_get_section_by_name (input, ".rsrc");
 
@@ -3976,7 +4065,7 @@ rsrc_process_section (bfd * abfd,
      starts on an 8-byte boundary.  FIXME: Is this correct ?  */
   sizeof_strings = (sizeof_strings + 7) & ~ 7;
 
-  new_data = bfd_malloc (size);
+  new_data = bfd_zalloc (abfd, size);
   if (new_data == NULL)
     goto end;
 
@@ -3993,6 +4082,24 @@ rsrc_process_section (bfd * abfd,
   /* Step five: Replace the old contents with the new.
      We recompute the size as we may have lost entries due to mergeing.  */
   size = ((write_data.next_data - new_data) + 3) & ~ 3;
+
+  {
+    int page_size;
+
+    if (coff_data (abfd)->link_info)
+      {
+	page_size = pe_data (abfd)->pe_opthdr.FileAlignment;
+
+	/* If no file alignment has been set, default to one.
+	   This repairs 'ld -r' for arm-wince-pe target.  */
+	if (page_size == 0)
+	  page_size = 1;
+      }
+    else
+      page_size = PE_DEF_FILE_ALIGNMENT;
+    size = (size + page_size - 1) & - page_size;
+  }
+
   bfd_set_section_contents (pfinfo->output_bfd, sec, new_data, 0, size);
   sec->size = sec->rawsize = size;
 

@@ -25,9 +25,6 @@
 #include "trad-frame.h"
 #include "tramp-frame.h"
 
-#include "gdb_assert.h"
-#include <string.h>
-
 #include "obsd-tdep.h"
 #include "mips-tdep.h"
 #include "solib-svr4.h"
@@ -61,7 +58,7 @@ mips64obsd_supply_gregset (const struct regset *regset,
 
 /* OpenBSD/mips64 register set.  */
 
-static struct regset mips64obsd_gregset =
+static const struct regset mips64obsd_gregset =
 {
   NULL,
   mips64obsd_supply_gregset

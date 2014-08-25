@@ -32,13 +32,15 @@
 /* Struct representing built-in completion types.  */
 struct cmdpy_completer
 {
-  /* Python symbol name.  */
+  /* Python symbol name.
+     This isn't a const char * for Python 2.4's sake.
+     PyModule_AddIntConstant only takes a char *, sigh.  */
   char *name;
   /* Completion function.  */
   completer_ftype *completer;
 };
 
-static struct cmdpy_completer completers[] =
+static const struct cmdpy_completer completers[] =
 {
   { "COMPLETE_NONE", noop_completer },
   { "COMPLETE_FILENAME", filename_completer },
@@ -106,8 +108,8 @@ cmdpy_destroyer (struct cmd_list_element *self, void *context)
   /* We allocated the name, doc string, and perhaps the prefix
      name.  */
   xfree ((char *) self->name);
-  xfree (self->doc);
-  xfree (self->prefixname);
+  xfree ((char *) self->doc);
+  xfree ((char *) self->prefixname);
 
   do_cleanups (cleanup);
 }

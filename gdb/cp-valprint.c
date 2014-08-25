@@ -27,7 +27,6 @@
 #include "gdbcmd.h"
 #include "demangle.h"
 #include "annotate.h"
-#include <string.h>
 #include "c-lang.h"
 #include "target.h"
 #include "cp-abi.h"
@@ -208,8 +207,8 @@ cp_print_value_fields (struct type *type, struct type *real_type,
     fprintf_filtered (stream, "<No data fields>");
   else
     {
-      int statmem_obstack_initial_size = 0;
-      int stat_array_obstack_initial_size = 0;
+      size_t statmem_obstack_initial_size = 0;
+      size_t stat_array_obstack_initial_size = 0;
       struct type *vptr_basetype = NULL;
       int vptr_fieldno;
 
@@ -294,12 +293,6 @@ cp_print_value_fields (struct type *type, struct type *real_type,
 		{
 		  fputs_filtered (_("<synthetic pointer>"), stream);
 		}
-	      else if (!value_bits_valid (val,
-					  TYPE_FIELD_BITPOS (type, i),
-					  TYPE_FIELD_BITSIZE (type, i)))
-		{
-		  val_print_optimized_out (val, stream);
-		}
 	      else
 		{
 		  struct value_print_options opts = *options;
@@ -370,7 +363,7 @@ cp_print_value_fields (struct type *type, struct type *real_type,
 
       if (dont_print_statmem == 0)
 	{
-	  int obstack_final_size =
+	  size_t obstack_final_size =
            obstack_object_size (&dont_print_statmem_obstack);
 
 	  if (obstack_final_size > statmem_obstack_initial_size)
@@ -387,7 +380,7 @@ cp_print_value_fields (struct type *type, struct type *real_type,
 
 	  if (last_set_recurse != recurse)
 	    {
-	      int obstack_final_size =
+	      size_t obstack_final_size =
 		obstack_object_size (&dont_print_stat_array_obstack);
 	      
 	      if (obstack_final_size > stat_array_obstack_initial_size)
@@ -434,8 +427,9 @@ cp_print_value_fields_rtti (struct type *type,
 
   /* We require all bits to be valid in order to attempt a
      conversion.  */
-  if (value_bits_valid (val, TARGET_CHAR_BIT * offset,
-			TARGET_CHAR_BIT * TYPE_LENGTH (type)))
+  if (!value_bits_any_optimized_out (val,
+				     TARGET_CHAR_BIT * offset,
+				     TARGET_CHAR_BIT * TYPE_LENGTH (type)))
     {
       struct value *value;
       int full, top, using_enc;

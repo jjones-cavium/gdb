@@ -17,11 +17,10 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#include <stddef.h>
+#include "server.h"
 #include <signal.h>
 #include <limits.h>
 #include <inttypes.h>
-#include "server.h"
 #include "linux-low.h"
 #include "i387-fp.h"
 #include "i386-low.h"
@@ -206,6 +205,7 @@ static const int x86_64_regmap[] =
 };
 
 #define X86_64_NUM_REGS (sizeof (x86_64_regmap) / sizeof (x86_64_regmap[0]))
+#define X86_64_USER_REGS (GS + 1)
 
 #else /* ! __x86_64__ */
 
@@ -364,6 +364,10 @@ x86_fill_gregset (struct regcache *regcache, void *buf)
 	  collect_register (regcache, i, ((char *) buf) + x86_64_regmap[i]);
       return;
     }
+
+  /* 32-bit inferior registers need to be zero-extended.
+     Callers would read uninitialized memory otherwise.  */
+  memset (buf, 0x00, X86_64_USER_REGS * 8);
 #endif
 
   for (i = 0; i < I386_NUM_REGS; i++)
@@ -582,8 +586,8 @@ update_debug_registers_callback (struct inferior_list_entry *entry,
 
 /* Update the inferior's debug register REGNUM from STATE.  */
 
-void
-i386_dr_low_set_addr (const struct i386_debug_reg_state *state, int regnum)
+static void
+i386_dr_low_set_addr (int regnum, CORE_ADDR addr)
 {
   /* Only update the threads of this process.  */
   int pid = pid_of (current_inferior);
@@ -596,7 +600,7 @@ i386_dr_low_set_addr (const struct i386_debug_reg_state *state, int regnum)
 
 /* Return the inferior's debug register REGNUM.  */
 
-CORE_ADDR
+static CORE_ADDR
 i386_dr_low_get_addr (int regnum)
 {
   ptid_t ptid = ptid_of (current_inferior);
@@ -609,8 +613,8 @@ i386_dr_low_get_addr (int regnum)
 
 /* Update the inferior's DR7 debug control register from STATE.  */
 
-void
-i386_dr_low_set_control (const struct i386_debug_reg_state *state)
+static void
+i386_dr_low_set_control (unsigned long control)
 {
   /* Only update the threads of this process.  */
   int pid = pid_of (current_inferior);
@@ -620,7 +624,7 @@ i386_dr_low_set_control (const struct i386_debug_reg_state *state)
 
 /* Return the inferior's DR7 debug control register.  */
 
-unsigned
+static unsigned long
 i386_dr_low_get_control (void)
 {
   ptid_t ptid = ptid_of (current_inferior);
@@ -631,43 +635,63 @@ i386_dr_low_get_control (void)
 /* Get the value of the DR6 debug status register from the inferior
    and record it in STATE.  */
 
-unsigned
+static unsigned long
 i386_dr_low_get_status (void)
 {
   ptid_t ptid = ptid_of (current_inferior);
 
   return x86_linux_dr_get (ptid, DR_STATUS);
 }
+
+/* Low-level function vector.  */
+struct i386_dr_low_type i386_dr_low =
+  {
+    i386_dr_low_set_control,
+    i386_dr_low_set_addr,
+    i386_dr_low_get_addr,
+    i386_dr_low_get_status,
+    i386_dr_low_get_control,
+    sizeof (void *),
+  };
 
 /* Breakpoint/Watchpoint support.  */
 
 static int
-x86_insert_point (char type, CORE_ADDR addr, int len)
+x86_supports_z_point_type (char z_type)
+{
+  switch (z_type)
+    {
+    case Z_PACKET_SW_BP:
+    case Z_PACKET_HW_BP:
+    case Z_PACKET_WRITE_WP:
+    case Z_PACKET_ACCESS_WP:
+      return 1;
+    default:
+      return 0;
+    }
+}
+
+static int
+x86_insert_point (enum raw_bkpt_type type, CORE_ADDR addr,
+		  int size, struct raw_breakpoint *bp)
 {
   struct process_info *proc = current_process ();
+
   switch (type)
     {
-    case '0': /* software-breakpoint */
-      {
-	int ret;
+    case raw_bkpt_type_sw:
+      return insert_memory_breakpoint (bp);
 
-	ret = prepare_to_access_memory ();
-	if (ret)
-	  return -1;
-	ret = set_gdb_breakpoint_at (addr);
-	done_accessing_memory ();
-	return ret;
-      }
-    case '1': /* hardware-breakpoint */
-    case '2': /* write watchpoint */
-    case '3': /* read watchpoint */
-    case '4': /* access watchpoint */
+    case raw_bkpt_type_hw:
+    case raw_bkpt_type_write_wp:
+    case raw_bkpt_type_access_wp:
       {
-	enum target_hw_bp_type hw_type = Z_packet_to_hw_type (type);
+	enum target_hw_bp_type hw_type
+	  = raw_bkpt_type_to_target_hw_bp_type (type);
 	struct i386_debug_reg_state *state
 	  = &proc->private->arch_private->debug_reg_state;
 
-	return i386_low_insert_watchpoint (state, hw_type, addr, len);
+	return i386_dr_insert_watchpoint (state, hw_type, addr, size);
       }
 
     default:
@@ -677,32 +701,26 @@ x86_insert_point (char type, CORE_ADDR addr, int len)
 }
 
 static int
-x86_remove_point (char type, CORE_ADDR addr, int len)
+x86_remove_point (enum raw_bkpt_type type, CORE_ADDR addr,
+		  int size, struct raw_breakpoint *bp)
 {
   struct process_info *proc = current_process ();
+
   switch (type)
     {
-    case '0': /* software-breakpoint */
-      {
-	int ret;
+    case raw_bkpt_type_sw:
+      return remove_memory_breakpoint (bp);
 
-	ret = prepare_to_access_memory ();
-	if (ret)
-	  return -1;
-	ret = delete_gdb_breakpoint_at (addr);
-	done_accessing_memory ();
-	return ret;
-      }
-    case '1': /* hardware-breakpoint */
-    case '2': /* write watchpoint */
-    case '3': /* read watchpoint */
-    case '4': /* access watchpoint */
+    case raw_bkpt_type_hw:
+    case raw_bkpt_type_write_wp:
+    case raw_bkpt_type_access_wp:
       {
-	enum target_hw_bp_type hw_type = Z_packet_to_hw_type (type);
+	enum target_hw_bp_type hw_type
+	  = raw_bkpt_type_to_target_hw_bp_type (type);
 	struct i386_debug_reg_state *state
 	  = &proc->private->arch_private->debug_reg_state;
 
-	return i386_low_remove_watchpoint (state, hw_type, addr, len);
+	return i386_dr_remove_watchpoint (state, hw_type, addr, size);
       }
     default:
       /* Unsupported.  */
@@ -714,7 +732,7 @@ static int
 x86_stopped_by_watchpoint (void)
 {
   struct process_info *proc = current_process ();
-  return i386_low_stopped_by_watchpoint (&proc->private->arch_private->debug_reg_state);
+  return i386_dr_stopped_by_watchpoint (&proc->private->arch_private->debug_reg_state);
 }
 
 static CORE_ADDR
@@ -722,8 +740,8 @@ x86_stopped_data_address (void)
 {
   struct process_info *proc = current_process ();
   CORE_ADDR addr;
-  if (i386_low_stopped_data_address (&proc->private->arch_private->debug_reg_state,
-				     &addr))
+  if (i386_dr_stopped_data_address (&proc->private->arch_private->debug_reg_state,
+				    &addr))
     return addr;
   return 0;
 }
@@ -769,6 +787,8 @@ x86_linux_prepare_to_resume (struct lwp_info *lwp)
       struct i386_debug_reg_state *state
 	= &proc->private->arch_private->debug_reg_state;
 
+      x86_linux_dr_set (ptid, DR_CONTROL, 0);
+
       for (i = DR_FIRSTADDR; i <= DR_LASTADDR; i++)
 	if (state->dr_ref_count[i] > 0)
 	  {
@@ -776,12 +796,13 @@ x86_linux_prepare_to_resume (struct lwp_info *lwp)
 
 	    /* If we're setting a watchpoint, any change the inferior
 	       had done itself to the debug registers needs to be
-	       discarded, otherwise, i386_low_stopped_data_address can
+	       discarded, otherwise, i386_dr_stopped_data_address can
 	       get confused.  */
 	    clear_status = 1;
 	  }
 
-      x86_linux_dr_set (ptid, DR_CONTROL, state->dr_control_mirror);
+      if (state->dr_control_mirror != 0)
+	x86_linux_dr_set (ptid, DR_CONTROL, state->dr_control_mirror);
 
       lwp->arch_private->debug_registers_changed = 0;
     }
@@ -3397,6 +3418,7 @@ struct linux_target_ops the_low_target =
   NULL,
   1,
   x86_breakpoint_at,
+  x86_supports_z_point_type,
   x86_insert_point,
   x86_remove_point,
   x86_stopped_by_watchpoint,

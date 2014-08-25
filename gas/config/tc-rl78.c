@@ -20,7 +20,6 @@
 
 #include "as.h"
 #include "struc-symbol.h"
-#include "obstack.h"
 #include "safe-ctype.h"
 #include "dwarf2dbg.h"
 #include "libbfd.h"
@@ -282,6 +281,8 @@ enum options
 {
   OPTION_RELAX = OPTION_MD_BASE,
   OPTION_G10,
+  OPTION_32BIT_DOUBLES,
+  OPTION_64BIT_DOUBLES,
 };
 
 #define RL78_SHORTOPTS ""
@@ -292,6 +293,8 @@ struct option md_longopts[] =
 {
   {"relax", no_argument, NULL, OPTION_RELAX},
   {"mg10", no_argument, NULL, OPTION_G10},
+  {"m32bit-doubles", no_argument, NULL, OPTION_32BIT_DOUBLES},
+  {"m64bit-doubles", no_argument, NULL, OPTION_64BIT_DOUBLES},
   {NULL, no_argument, NULL, 0}
 };
 size_t md_longopts_size = sizeof (md_longopts);
@@ -308,6 +311,14 @@ md_parse_option (int c, char * arg ATTRIBUTE_UNUSED)
     case OPTION_G10:
       elf_flags |= E_FLAG_RL78_G10;
       return 1;
+
+    case OPTION_32BIT_DOUBLES:
+      elf_flags &= ~ E_FLAG_RL78_64BIT_DOUBLES;
+      return 1;
+
+    case OPTION_64BIT_DOUBLES:
+      elf_flags |= E_FLAG_RL78_64BIT_DOUBLES;
+      return 1;
     }
   return 0;
 }
@@ -315,8 +326,11 @@ md_parse_option (int c, char * arg ATTRIBUTE_UNUSED)
 void
 md_show_usage (FILE * stream ATTRIBUTE_UNUSED)
 {
+  fprintf (stream, _(" RL78 specific command line options:\n"));
+  fprintf (stream, _("  --mg10            Enable support for G10 variant\n"));
+  fprintf (stream, _("  --m32bit-doubles  [default]\n"));
+  fprintf (stream, _("  --m64bit-doubles\n"));
 }
-
 
 static void
 s_bss (int ignore ATTRIBUTE_UNUSED)
@@ -328,15 +342,23 @@ s_bss (int ignore ATTRIBUTE_UNUSED)
   demand_empty_rest_of_line ();
 }
 
+static void
+rl78_float_cons (int ignore ATTRIBUTE_UNUSED)
+{
+  if (elf_flags & E_FLAG_RL78_64BIT_DOUBLES)
+    return float_cons ('d');
+  return float_cons ('f');
+}
+
 /* The target specific pseudo-ops which we support.  */
 const pseudo_typeS md_pseudo_table[] =
 {
-  /* Our "standard" pseudos. */
-  { "double",   float_cons,    'd' },
-  { "bss",	s_bss, 		0 },
-  { "3byte",	cons,		3 },
-  { "int",	cons,		4 },
-  { "word",	cons,		4 },
+  /* Our "standard" pseudos.  */
+  { "double", rl78_float_cons,	'd' },
+  { "bss",    s_bss, 		0 },
+  { "3byte",  cons,		3 },
+  { "int",    cons,		4 },
+  { "word",   cons,		4 },
 
   /* End of list marker.  */
   { NULL, 	NULL, 		0 }
@@ -1339,11 +1361,20 @@ md_apply_fix (struct fix * f ATTRIBUTE_UNUSED,
       break;
 
     case BFD_RELOC_32:
-    case BFD_RELOC_RL78_DIFF:
       op[0] = val;
       op[1] = val >> 8;
       op[2] = val >> 16;
       op[3] = val >> 24;
+      break;
+
+    case BFD_RELOC_RL78_DIFF:
+      op[0] = val;
+      if (f->fx_size > 1)
+	op[1] = val >> 8;
+      if (f->fx_size > 2)
+	op[2] = val >> 16;
+      if (f->fx_size > 3)
+	op[3] = val >> 24;
       break;
 
     case BFD_RELOC_RL78_HI8:

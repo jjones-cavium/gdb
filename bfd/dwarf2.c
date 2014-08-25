@@ -911,6 +911,14 @@ read_abbrevs (bfd *abfd, bfd_uint64_t offset, struct dwarf2_debug *stash)
   return abbrevs;
 }
 
+/* Returns true if the form is one which has a string value.  */
+
+static inline bfd_boolean
+is_str_attr (enum dwarf_form form)
+{
+  return form == DW_FORM_string || form == DW_FORM_strp || form == DW_FORM_GNU_strp_alt;
+}
+
 /* Read an attribute value described by an attribute form.  */
 
 static bfd_byte *
@@ -1994,6 +2002,7 @@ lookup_address_in_function_table (struct comp_unit *unit,
 {
   struct funcinfo* each_func;
   struct funcinfo* best_fit = NULL;
+  bfd_vma best_fit_len = 0;
   struct arange *arange;
 
   for (each_func = unit->function_table;
@@ -2007,9 +2016,11 @@ lookup_address_in_function_table (struct comp_unit *unit,
 	  if (addr >= arange->low && addr < arange->high)
 	    {
 	      if (!best_fit
-		  || (arange->high - arange->low
-		      < best_fit->arange.high - best_fit->arange.low))
-		best_fit = each_func;
+		  || arange->high - arange->low < best_fit_len)
+		{
+		  best_fit = each_func;
+		  best_fit_len = arange->high - arange->low;
+		}
 	    }
 	}
     }
@@ -2038,6 +2049,7 @@ lookup_symbol_in_function_table (struct comp_unit *unit,
 {
   struct funcinfo* each_func;
   struct funcinfo* best_fit = NULL;
+  bfd_vma best_fit_len = 0;
   struct arange *arange;
   const char *name = bfd_asymbol_name (sym);
   asection *sec = bfd_get_section (sym);
@@ -2056,9 +2068,11 @@ lookup_symbol_in_function_table (struct comp_unit *unit,
 	      && each_func->name
 	      && strcmp (name, each_func->name) == 0
 	      && (!best_fit
-		  || (arange->high - arange->low
-		      < best_fit->arange.high - best_fit->arange.low)))
-	    best_fit = each_func;
+		  || arange->high - arange->low < best_fit_len))
+	    {
+	      best_fit = each_func;
+	      best_fit_len = arange->high - arange->low;
+	    }
 	}
     }
 
@@ -2195,7 +2209,7 @@ find_abstract_instance_name (struct comp_unit *unit,
 		case DW_AT_name:
 		  /* Prefer DW_AT_MIPS_linkage_name or DW_AT_linkage_name
 		     over DW_AT_name.  */
-		  if (name == NULL)
+		  if (name == NULL && is_str_attr (attr.form))
 		    name = attr.u.str;
 		  break;
 		case DW_AT_specification:
@@ -2203,7 +2217,10 @@ find_abstract_instance_name (struct comp_unit *unit,
 		  break;
 		case DW_AT_linkage_name:
 		case DW_AT_MIPS_linkage_name:
-		  name = attr.u.str;
+		  /* PR 16949:  Corrupt debug info can place
+		     non-string forms into these attributes.  */
+		  if (is_str_attr (attr.name))
+		    name = attr.u.str;
 		  break;
 		default:
 		  break;
@@ -2375,13 +2392,16 @@ scan_unit_for_symbols (struct comp_unit *unit)
 		case DW_AT_name:
 		  /* Prefer DW_AT_MIPS_linkage_name or DW_AT_linkage_name
 		     over DW_AT_name.  */
-		  if (func->name == NULL)
+		  if (func->name == NULL && is_str_attr (attr.form))
 		    func->name = attr.u.str;
 		  break;
 
 		case DW_AT_linkage_name:
 		case DW_AT_MIPS_linkage_name:
-		  func->name = attr.u.str;
+		  /* PR 16949:  Corrupt debug info can place
+		     non-string forms into these attributes.  */
+		  if (is_str_attr (attr.form))
+		    func->name = attr.u.str;
 		  break;
 
 		case DW_AT_low_pc:
@@ -3173,6 +3193,7 @@ info_hash_lookup_funcinfo (struct info_hash_table *hash_table,
 {
   struct funcinfo* each_func;
   struct funcinfo* best_fit = NULL;
+  bfd_vma best_fit_len = 0;
   struct info_list_node *node;
   struct arange *arange;
   const char *name = bfd_asymbol_name (sym);
@@ -3191,9 +3212,11 @@ info_hash_lookup_funcinfo (struct info_hash_table *hash_table,
 	      && addr >= arange->low
 	      && addr < arange->high
 	      && (!best_fit
-		  || (arange->high - arange->low
-		      < best_fit->arange.high - best_fit->arange.low)))
-	    best_fit = each_func;
+		  || arange->high - arange->low < best_fit_len))
+	    {
+	      best_fit = each_func;
+	      best_fit_len = arange->high - arange->low;
+	    }
 	}
     }
 

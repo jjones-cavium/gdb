@@ -36,8 +36,6 @@
 #include "regcache.h"
 #include "exceptions.h"
 
-#include <string.h>
-
 #define IS_32BIT_TARGET(_gdbarch) \
 	((gdbarch_tdep (_gdbarch))->bytes_per_address == 4)
 
@@ -1367,7 +1365,7 @@ hppa_hpux_supply_save_state (const struct regset *regset,
 
 /* HP-UX register set.  */
 
-static struct regset hppa_hpux_regset =
+static const struct regset hppa_hpux_regset =
 {
   NULL,
   hppa_hpux_supply_save_state

@@ -30,8 +30,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <ctype.h>
-
-#include <string.h>
 #include "event-loop.h"
 #include "ui-out.h"
 
@@ -45,6 +43,8 @@
 
 #include "filenames.h"
 #include "filestuff.h"
+#include <signal.h>
+#include "event-top.h"
 
 /* The selected interpreter.  This will be used as a set command
    variable, so it should always be malloc'ed - since
@@ -105,6 +105,41 @@ get_gdb_program_name (void)
 }
 
 static void print_gdb_help (struct ui_file *);
+
+/* Set the data-directory parameter to NEW_DATADIR.
+   If NEW_DATADIR is not a directory then a warning is printed.
+   We don't signal an error for backward compatibility.  */
+
+void
+set_gdb_data_directory (const char *new_datadir)
+{
+  struct stat st;
+
+  if (stat (new_datadir, &st) < 0)
+    {
+      int save_errno = errno;
+
+      fprintf_unfiltered (gdb_stderr, "Warning: ");
+      print_sys_errmsg (new_datadir, save_errno);
+    }
+  else if (!S_ISDIR (st.st_mode))
+    warning (_("%s is not a directory."), new_datadir);
+
+  xfree (gdb_datadir);
+  gdb_datadir = gdb_realpath (new_datadir);
+
+  /* gdb_realpath won't return an absolute path if the path doesn't exist,
+     but we still want to record an absolute path here.  If the user entered
+     "../foo" and "../foo" doesn't exist then we'll record $(pwd)/../foo which
+     isn't canonical, but that's ok.  */
+  if (!IS_ABSOLUTE_PATH (gdb_datadir))
+    {
+      char *abs_datadir = gdb_abspath (gdb_datadir);
+
+      xfree (gdb_datadir);
+      gdb_datadir = abs_datadir;
+    }
+}
 
 /* Relocate a file or directory.  PROGNAME is the name by which gdb
    was invoked (i.e., argv[0]).  INITIAL is the default value for the
@@ -253,6 +288,27 @@ get_init_files (const char **system_gdbinit,
   *local_gdbinit = localinit;
 }
 
+/* Try to set up an alternate signal stack for SIGSEGV handlers.
+   This allows us to handle SIGSEGV signals generated when the
+   normal process stack is exhausted.  If this stack is not set
+   up (sigaltstack is unavailable or fails) and a SIGSEGV is
+   generated when the normal stack is exhausted then the program
+   will behave as though no SIGSEGV handler was installed.  */
+
+static void
+setup_alternate_signal_stack (void)
+{
+#ifdef HAVE_SIGALTSTACK
+  stack_t ss;
+
+  ss.ss_sp = xmalloc (SIGSTKSZ);
+  ss.ss_size = SIGSTKSZ;
+  ss.ss_flags = 0;
+
+  sigaltstack(&ss, NULL);
+#endif
+}
+
 /* Call command_loop.  If it happens to return, pass that through as a
    non-zero return status.  */
 
@@ -278,6 +334,63 @@ captured_command_loop (void *data)
      loop.  */
   quit_command (NULL, instream == stdin);
   return 1;
+}
+
+/* Handle command errors thrown from within
+   catch_command_errors/catch_command_errors_const.  */
+
+static int
+handle_command_errors (volatile struct gdb_exception e)
+{
+  if (e.reason < 0)
+    {
+      exception_print (gdb_stderr, e);
+
+      /* If any exception escaped to here, we better enable stdin.
+	 Otherwise, any command that calls async_disable_stdin, and
+	 then throws, will leave stdin inoperable.  */
+      async_enable_stdin ();
+      return 0;
+    }
+  return 1;
+}
+
+/* Type of the command callback passed to catch_command_errors.  */
+
+typedef void (catch_command_errors_ftype) (char *, int);
+
+/* Wrap calls to commands run before the event loop is started.  */
+
+static int
+catch_command_errors (catch_command_errors_ftype *command,
+		      char *arg, int from_tty, return_mask mask)
+{
+  volatile struct gdb_exception e;
+
+  TRY_CATCH (e, mask)
+    {
+      command (arg, from_tty);
+    }
+  return handle_command_errors (e);
+}
+
+/* Type of the command callback passed to catch_command_errors_const.  */
+
+typedef void (catch_command_errors_const_ftype) (const char *, int);
+
+/* Like catch_command_errors, but works with const command and args.  */
+
+static int
+catch_command_errors_const (catch_command_errors_const_ftype *command,
+			    const char *arg, int from_tty, return_mask mask)
+{
+  volatile struct gdb_exception e;
+
+  TRY_CATCH (e, mask)
+    {
+      command (arg, from_tty);
+    }
+  return handle_command_errors (e);
 }
 
 /* Arguments of --command option and its counterpart.  */
@@ -517,6 +630,7 @@ captured_main (void *data)
       {"directory", required_argument, 0, 'd'},
       {"d", required_argument, 0, 'd'},
       {"data-directory", required_argument, 0, 'D'},
+      {"D", required_argument, 0, 'D'},
       {"cd", required_argument, 0, OPT_CD},
       {"tty", required_argument, 0, 't'},
       {"baud", required_argument, 0, 'b'},
@@ -641,8 +755,15 @@ captured_main (void *data)
 	    gdb_stdout = ui_file_new();
 	    break;
 	  case 'D':
-	    xfree (gdb_datadir);
-	    gdb_datadir = xstrdup (optarg);
+	    if (optarg[0] == '\0')
+	      {
+		fprintf_unfiltered (gdb_stderr,
+				    _("%s: empty path for"
+				      " `--data-directory'\n"),
+				    argv[0]);
+		exit (1);
+	      }
+	    set_gdb_data_directory (optarg);
 	    gdb_datadir_provided = 1;
 	    break;
 #ifdef GDBTK
@@ -741,6 +862,9 @@ captured_main (void *data)
     if (batch_flag)
       quiet = 1;
   }
+
+  /* Try to set up an alternate signal stack for SIGSEGV handlers.  */
+  setup_alternate_signal_stack ();
 
   /* Initialize all files.  Give the interpreter a chance to take
      control of the console via the deprecated_init_ui_hook ().  */
@@ -942,16 +1066,16 @@ captured_main (void *data)
       /* The exec file and the symbol-file are the same.  If we can't
          open it, better only print one error message.
          catch_command_errors returns non-zero on success!  */
-      if (catch_command_errors (exec_file_attach, execarg,
-				!batch_flag, RETURN_MASK_ALL))
+      if (catch_command_errors_const (exec_file_attach, execarg,
+				      !batch_flag, RETURN_MASK_ALL))
 	catch_command_errors_const (symbol_file_add_main, symarg,
 				    !batch_flag, RETURN_MASK_ALL);
     }
   else
     {
       if (execarg != NULL)
-	catch_command_errors (exec_file_attach, execarg,
-			      !batch_flag, RETURN_MASK_ALL);
+	catch_command_errors_const (exec_file_attach, execarg,
+				    !batch_flag, RETURN_MASK_ALL);
       if (symarg != NULL)
 	catch_command_errors_const (symbol_file_add_main, symarg,
 				    !batch_flag, RETURN_MASK_ALL);
@@ -1130,7 +1254,8 @@ Output and user interface control:\n\n\
   fputs_unfiltered (_("\
   --dbx              DBX compatibility mode.\n\
   --xdb              XDB compatibility mode.\n\
-  --quiet            Do not print version number on startup.\n\n\
+  -q, --quiet, --silent\n\
+                     Do not print version number on startup.\n\n\
 "), stream);
   fputs_unfiltered (_("\
 Operating modes:\n\n\
@@ -1146,6 +1271,8 @@ Remote debugging options:\n\n\
   -l TIMEOUT         Set timeout in seconds for remote debugging.\n\n\
 Other options:\n\n\
   --cd=DIR           Change current directory to DIR.\n\
+  --data-directory=DIR, -D\n\
+                     Set GDB's data-directory to DIR.\n\
 "), stream);
   fputs_unfiltered (_("\n\
 At startup, GDB reads the following init files and executes their commands:\n\

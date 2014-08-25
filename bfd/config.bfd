@@ -77,7 +77,6 @@ case $targ in
  m68*-bull-sysv* | \
  maxq-*-coff | \
  mips*el-*-rtems* | \
- or1k-*-rtems* | \
  powerpcle-*-rtems* | \
  sparc*-*-rtemsaout* | \
  sparc-*-lynxos* | \
@@ -286,11 +285,11 @@ case "${targ}" in
     targ_defvec=arm_aout_nbsd_vec
     targ_selvecs="arm_elf32_le_vec arm_elf32_be_vec"
     targ_underscore=yes
-    targ_cflags=-D__QNXTARGET__
     ;;
   arm-*-nto* | nto*arm*)
     targ_defvec=arm_elf32_le_vec
     targ_selvecs=arm_elf32_be_vec
+    targ_cflags=-D__QNXTARGET__
     ;;
   arm-*-riscix*)
     targ_defvec=arm_aout_riscix_vec
@@ -329,7 +328,7 @@ case "${targ}" in
     targ_defvec=arm_elf32_le_vec
     targ_selvecs=arm_elf32_be_vec
     ;;
-  armeb-*-elf | arm*b-*-freebsd* | arm*b-*-linux-*)
+  armeb-*-elf | arm*b-*-freebsd* | arm*b-*-linux-* | armeb-*-eabi*)
     targ_defvec=arm_elf32_be_vec
     targ_selvecs=arm_elf32_le_vec
     ;;
@@ -445,6 +444,10 @@ case "${targ}" in
   moxie-*-elf | moxie-*-rtems* | moxie-*-uclinux)
     targ_defvec=moxie_elf32_be_vec
     targ_selvecs=moxie_elf32_le_vec
+    ;;
+
+  moxie-*-moxiebox*)
+    targ_defvec=moxie_elf32_le_vec
     ;;
 
   h8300*-*-rtemscoff*)
@@ -1175,11 +1178,11 @@ case "${targ}" in
     targ_selvecs=nios2_elf32_be_vec
     ;;
 
-  or1k-*-elf | or1k-*-linux*)
+  or1k-*-elf | or1k-*-linux* | or1k-*-rtems*)
     targ_defvec=or1k_elf32_vec
     ;;
 
-  or1knd-*-elf | or1knd-*-linux*)
+  or1knd-*-elf | or1knd-*-linux* | or1k-*-rtems*)
     targ_defvec=or1k_elf32_vec
     ;;
 

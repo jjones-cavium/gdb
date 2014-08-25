@@ -1,3 +1,209 @@
+2014-08-13  Sriraman Tallam  <tmsriram@google.com>
+
+	* options.h (-no-pie): Add option.
+
+2014-08-08  Jing Yu  <jingyu@google.com>
+	    Han Shen  <shenhan@google.com>
+
+	* Makefile.am (HFILES): Add aarch64-reloc-property.h.
+	(DEFFILES): add aarch64-reloc.def.
+	(TARGETSOURCES): Add aarch64-reloc-property.cc.
+	(ALL_TARGETOBJS): Add aarch64-reloc-property.$(OBJEXT).
+	* Makefile.in: Regenerate.
+	* aarch64-reloc-property.cc: New file.
+	* aarch64-reloc-property.h: New file.
+	* aarch64-reloc.def: New file.
+	* aarch64.cc: Include aarch64-reloc-property.h. Replace spaces
+	with tab to make the format consistent.
+	(Output_data_got_aarch64::symbol_table_): New method.
+	(Target_aarch64::do_plt_address_for_global): New method.
+	(Target_aarch64::do_plt_address_for_local): New method.
+	(Target_aarch64::do_select_as_default_target): New method.
+	(Target_aarch64::do_make_data_plt): New method.
+	(Target_aarch64::make_data_plt): New method.
+	(Output_data_plt_aarch64::has_irelative_section): New method.
+	(Output_data_plt_aarch64::address_for_global): New method.
+	(Output_data_plt_aarch64::address_for_local): New method.
+	(Output_data_plt_aarch64::irelative_rel_): New parameter.
+	(Output_data_plt_aarch64::add_entry): Implement contents.
+	(Output_data_plt_aarch64::set_final_data_size): Fix typo.
+	(Output_data_plt_aarch64::do_write): Remove useless got_base. Set
+	the got_pov entry to plt0.
+	(Output_data_plt_aarch64_standard::do_fill_first_plt_entry):
+	Implement contents.
+	(Output_data_plt_aarch64_standard::do_fill_plt_entry): Implement.
+	(AArch64_howto): New struct.
+	(aarch64_howto[]): New static const array.
+	(AArch64_relocate_functions): New class.
+	(Target_aarch64::Scan::get_reference_flags): Remove method.
+	(Target_aarch64::Scan::local): Implement to support a few relocations.
+	(Target_aarch64::Scan::global): Implement to support a few relocations.
+	(Target_aarch64::make_plt_section): Implement contents.
+	(Target_aarch64::make_plt_entry): Implement contents.
+	(Target_aarch64::do_finalize_sections): Implement contents.
+	(Target_aarch64::Relocate::relocate): Implement a few relocations.
+	(Target_aarch64::relocate_section): Implement contents.
+
+2014-08-06  Alan Modra  <amodra@gmail.com>
+
+	* testsuite/defsym_test.sh: Allow ppc64le localentry annotation.
+
+2014-08-06  Alan Modra  <amodra@gmail.com>
+
+	PR 13227
+	* symtab.cc (Symbol_table::add_from_relobj): Warn on __gnu_lto_slim.
+
+2014-07-21  Sriraman Tallam  <tmsriram@google.com>
+
+	* object.cc (Relobj::is_section_name_included): Add
+	".rodata.nptl_version" to not garbage collect this section.
+
+2014-07-08  Cary Coutant  <ccoutant@google.com>
+
+	* expression.cc (struct Expression::Expression_eval_info): Add
+	new fields type_pointer, vis_pointer, and nonvis_pointer.
+	(Expression::eval_maybe_dot): Add type_pointer, vis_pointer, and
+	nonvis_pointer parameters. Adjust all calls.
+	(Symbol_expression::value): Update type, visibility, and nonvis bits
+	in caller.
+	* script.cc (Symbol_assignment::sized_finalize): Update type,
+	visibility, and remaining st_other bits for new symbol.
+	* script.h: (Expression::eval_maybe_dot): Add type_pointer,
+	vis_pointer, and nonvis_pointer parameters.
+	* symtab.h (Symbol::set_type): New method.
+
+	* testsuite/Makefile.am (defsym_test): New test.
+	* testsuite/Makefile.in: Regenerate.
+	* testsuite/defsym_test.c: New file.
+	* testsuite/defsym_test.sh: New file.
+
+2014-07-08  Cary Coutant  <ccoutant@google.com>
+
+	PR gold/15639
+	* dynobj.h (Sized_dynobj::base_read_symbols): New method.
+	* dynobj.cc (Sized_dynobj::do_read_symbols): Move body to...
+	(Sized_dynobj::base_read_symbols): ...new method.
+	* object.h (Sized_relobj_file::base_read_symbols): New method.
+	* object.cc (Sized_relobj_file::do_read_symbols): Move body to...
+	(Sized_relobj_file::base_read_symbols): ...new method.
+	* arm.cc (Arm_relobj::do_read_symbols): Call base_read_symbols.
+	* mips.cc: (Mips_relobj::do_read_symbols): Likewise.
+	* powerpc.cc (Powerpc_dynobj::do_read_symbols): Likewise.
+
+2014-07-04  Alan Modra  <amodra@gmail.com>
+
+	* po/POTFILES.in: Regenerate.
+
+2014-07-02  Jing Yu  <jingyu@google.com>
+
+	* aarch64.cc: New file
+	* Makefile.am (TARGETSOURCES): Add aarch64.cc
+	(ALL_TARGETOBJS): Add aarch64.$(OBJEXT)
+	* Makefile.in: Regenerate.
+	* configure.tgt: Add entries for aarch64*.
+	* configure.ac:  Likewise.
+	* configure: Likewise.
+
+2014-06-27  Alan Modra  <amodra@gmail.com>
+
+	* symtab.cc (Symbol::should_add_dynsym_entry): Don't make inline.
+
+2014-06-24  Cary Coutant  <ccoutant@google.com>
+
+	* dwp.cc (Dwo_file::read): Allow files with no .debug_types
+	sections.
+	(Dwo_file::sized_read_unit_index): Likewise.
+
+2014-06-23  Sasa Stankovic  <Sasa.Stankovic@imgtec.com>
+
+	* mips.cc: New file.
+	* Makefile.am (TARGETSOURCES): Add mips.cc
+	(ALL_TARGETOBJS): Add mips.$(OBJEXT)
+	* configure.tgt: Add entries for mips*.
+	* configure.ac: Likewise.
+	* Makefile.in: Regenerate.
+	* configure: Likewise.
+
+2014-06-09  Cary Coutant  <ccoutant@google.com>
+
+	* dwarf_reader.cc (Dwarf_pubnames_table::read_header): Check that
+	unit_length is within section bounds.
+
+2014-06-09  Cary Coutant  <ccoutant@google.com>
+
+	PR gold/16980
+	* layout.cc (Layout::print_to_mapfile): Print unattached sections in
+	map.
+
+2014-06-07  Alan Modra  <amodra@gmail.com>
+
+	* powerpc.cc (relocate): Treat field of cmpli insn as a bitfield.
+
+2014-06-06  Cary Coutant  <ccoutant@google.com>
+
+	* dwarf_reader.h (Dwarf_pubnames_table): Remove output_section_offset_.
+	* dwarf_reader.cc (Dwarf_pubnames_table::read_section): Likewise.
+	(Dwarf_pubnames_table::read_header): Likewise.
+	* layout.cc (gdb_fast_lookup_sections): Add .debug_gnu_pubnames and
+	.debug_gnu_pubtypes.
+
+2014-06-05  Joel Brobecker  <brobecker@adacore.com>
+
+	* Makefile.am (CONFIG_STATUS_DEPENDENCIES): New.
+	* Makefile.in, configure: Regenerate.
+
+2014-06-03  Alan Modra  <amodra@gmail.com>
+
+	* powerpc.cc (addis_12_2): Define.
+	(Stub_table::do_write): Support fusion on ELFv2 stubs.
+
+2014-06-03  Alan Modra  <amodra@gmail.com>
+
+	* testsuite/plugin_test.c (parse_readelf_line): Skip non-visibility
+	st_other output.
+
+2014-06-02  Alan Modra  <amodra@gmail.com>
+
+	* powerpc.cc (Target_powerpc::local_reloc_may_be_function_pointer):
+	Only ignore relocs on ELFv1.
+	(Target_powerpc::global_reloc_may_be_function_pointer): Likewise.
+
+2014-05-30  Cary Coutant  <ccoutant@google.com>
+
+	* testsuite/Makefile.am (ehdr_start_test_4): Fix typo in -B option.
+	* testsuite/Makefile.in: Regenerate.
+	* testsuite/ehdr_start_test_4.sh: Look for "U" instead of "w".
+
+2014-05-27  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR gold/16945
+	* x86_64.cc (Target_x86_64::Relocate::relocate): Use signed int
+	for got_offset.  Properly get GOT address for R_X86_64_PLTOFF64.
+
+2014-05-15  Alan Modra  <amodra@gmail.com>
+
+	* powerpc.cc (do_plt_fde_location): Handle zero length .glink.
+	Compare FDE contents with DW_CFA_nop rather than 0.
+
+2014-05-13  Sriraman Tallam  <tmsriram@google.com>
+
+	* symtab.h (may_need_copy_reloc): Remove check for position independent
+	code.
+	* x86_64.cc (Target_x86_64<size>::Scan::global): Add check for no
+	position independence before pc absolute may_need_copy_reloc call.
+	Add check for executable output befor pc relative may_need_copy_reloc
+	call.
+	* i386.cc: Ditto.
+	* arm.cc: Ditto.
+	* sparc.cc: Ditto.
+	* tilegx.cc: Ditto.
+	* powerpc.cc: Add check for no position independence before
+	may_need_copy_reloc calls.
+	* testsuite/pie_copyrelocs_test.cc: New file.
+	* testsuite/pie_copyrelocs_shared_test.cc: New file.
+	* Makefile.am (pie_copyrelocs_test): New test.
+	* Makefile.in: Regenerate.
+
 2014-05-08  Martin Liška  <mliska@suse.cz>
 
 	* output.cc (Sized_relobj_file::do_layout): Fix typo in info message.
@@ -26,37 +232,37 @@
 	class.
 
 2014-05-05  Cary Coutant  <ccoutant@google.com>
-        
+
 	* gdb-index.cc (Gdb_index_info_reader): Don't complain about language
 	if we have pubnames/pubtypes.
 
 2014-05-02  Cary Coutant  <ccoutant@google.com>
 
-    	* defstd.cc (in_segment): Define __ehdr_start here...
-    	* layout.cc (Layout::finalize): ...Instead of here.  Set the
-    	output segment when known.
-    	* resolve.cc (Symbol::override_base_with_special): Remember
-    	the original binding.
-    	* symtab.cc (Symbol::set_output_segment): New function.
-    	(Symbol::set_undefined): New function.
-    	* symtab.h (Symbol::is_weak_undefined): Check original undef
-    	binding.
-    	(Symbol::is_strong_undefined): New function.
-    	(Symbol::set_output_segment): New function.
-    	(Symbol::set_undefined): New function.
-    	* target-reloc.h (is_strong_undefined): Remove.
-    	(issue_undefined_symbol_error): Call Symbol::is_weak_undefined.
-    	Check for hidden undefs.
-    	(relocate_section): Call Symbol::is_strong_undefined.
-    
-    	* testsuite/Makefile.am (ehdr_start_test_1)
-    	(ehdr_start_test_2, ehdr_start_test_3)
-    	(ehdr_start_test_4, ehdr_start_test_5): New test cases.
-    	* testsuite/Makefile.in: Regenerate.
-    	* testsuite/ehdr_start_def.cc: New source file.
-    	* testsuite/ehdr_start_test.cc: New source file.
-    	* testsuite/ehdr_start_test.t: New linker script.
-    	* testsuite/ehdr_start_test_4.sh: New shell script.
+	* defstd.cc (in_segment): Define __ehdr_start here...
+	* layout.cc (Layout::finalize): ...Instead of here.  Set the
+	output segment when known.
+	* resolve.cc (Symbol::override_base_with_special): Remember
+	the original binding.
+	* symtab.cc (Symbol::set_output_segment): New function.
+	(Symbol::set_undefined): New function.
+	* symtab.h (Symbol::is_weak_undefined): Check original undef
+	binding.
+	(Symbol::is_strong_undefined): New function.
+	(Symbol::set_output_segment): New function.
+	(Symbol::set_undefined): New function.
+	* target-reloc.h (is_strong_undefined): Remove.
+	(issue_undefined_symbol_error): Call Symbol::is_weak_undefined.
+	Check for hidden undefs.
+	(relocate_section): Call Symbol::is_strong_undefined.
+
+	* testsuite/Makefile.am (ehdr_start_test_1)
+	(ehdr_start_test_2, ehdr_start_test_3)
+	(ehdr_start_test_4, ehdr_start_test_5): New test cases.
+	* testsuite/Makefile.in: Regenerate.
+	* testsuite/ehdr_start_def.cc: New source file.
+	* testsuite/ehdr_start_test.cc: New source file.
+	* testsuite/ehdr_start_test.t: New linker script.
+	* testsuite/ehdr_start_test_4.sh: New shell script.
 
 2014-04-23  Cary Coutant  <ccoutant@google.com>
 
@@ -116,7 +322,7 @@
 	(Target::do_adjust_dyn_symbol): New function.
 
 2014-03-10  Sasa Stankovic  <Sasa.Stankovic@imgtec.com>
-  
+
 	* output.cc (Output_data_dynamic::Dynamic_entry::write):
 	Get the value of DYNAMIC_CUSTOM dynamic entry.
 	* output.h (Output_data_dynamic::add_custom): New function.
@@ -189,7 +395,7 @@
 	Check for is_strong_undefined.
 
 2014-02-05  Cary Coutant  <ccoutant@google.com>
-    
+
 	Fix problems with the --dynamic-list option.
 
 	PR gold/13577
@@ -202,11 +408,11 @@
 	(General_options::have_dynamic_list_): New data member.
 	* symtab.h (Symbol::is_preemptible): Handle --dynamic-list
 	correctly.
-   
+
 	PR gold/16530
 	* symtab.cc (Symbol_table::add_from_relobj): If symbol is named
 	in --dynamic-list, mark it.
-   
+
 	* testsuite/Makefile.am (gc_dynamic_list_test.sh): New test case.
 	(dynamic_list_2): New test case.
 	* testsuite/Makefile.in: Regenerate.

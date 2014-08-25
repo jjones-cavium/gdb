@@ -5093,6 +5093,29 @@ init_dwarf_regnames_x86_64 (void)
   dwarf_regnames_count = ARRAY_SIZE (dwarf_regnames_x86_64);
 }
 
+static const char *const dwarf_regnames_aarch64[] =
+{
+   "x0",  "x1",  "x2",  "x3",  "x4",  "x5",  "x6",  "x7", 
+   "x8",  "x9", "x10", "x11", "x12", "x13", "x14", "x15", 
+  "x16", "x17", "x18", "x19", "x20", "x21", "x22", "x23",
+  "x24", "x25", "x26", "x27", "x28", "x29", "x30", "sp",
+   NULL, "elr",  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,
+   NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,
+   NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,
+   NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,
+   "v0",  "v1",  "v2",  "v3",  "v4",  "v5",  "v6",  "v7", 
+   "v8",  "v9", "v10", "v11", "v12", "v13", "v14", "v15", 
+  "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23",
+  "v24", "v25", "v26", "v27", "v28", "v29", "v30", "v31",
+};
+
+void
+init_dwarf_regnames_aarch64 (void)
+{
+  dwarf_regnames = dwarf_regnames_aarch64;
+  dwarf_regnames_count = ARRAY_SIZE (dwarf_regnames_aarch64);
+}
+
 void
 init_dwarf_regnames (unsigned int e_machine)
 {
@@ -5107,6 +5130,10 @@ init_dwarf_regnames (unsigned int e_machine)
     case EM_L1OM:
     case EM_K1OM:
       init_dwarf_regnames_x86_64 ();
+      break;
+
+    case EM_AARCH64:
+      init_dwarf_regnames_aarch64 ();
       break;
 
     default:
@@ -5829,12 +5856,16 @@ display_debug_frames (struct dwarf_section *section,
 	      if (! do_debug_frames_interp)
 		printf ("  DW_CFA_remember_state\n");
 	      rs = (Frame_Chunk *) xmalloc (sizeof (Frame_Chunk));
+              rs->cfa_offset = fc->cfa_offset;
+	      rs->cfa_reg = fc->cfa_reg;
+	      rs->ra = fc->ra;
+	      rs->cfa_exp = fc->cfa_exp;
 	      rs->ncols = fc->ncols;
 	      rs->col_type = (short int *) xcmalloc (rs->ncols,
-                                                     sizeof (short int));
-	      rs->col_offset = (int *) xcmalloc (rs->ncols, sizeof (int));
-	      memcpy (rs->col_type, fc->col_type, rs->ncols);
-	      memcpy (rs->col_offset, fc->col_offset, rs->ncols * sizeof (int));
+                                                     sizeof (* rs->col_type));
+	      rs->col_offset = (int *) xcmalloc (rs->ncols, sizeof (* rs->col_offset));
+	      memcpy (rs->col_type, fc->col_type, rs->ncols * sizeof (* fc->col_type));
+	      memcpy (rs->col_offset, fc->col_offset, rs->ncols * sizeof (* fc->col_offset));
 	      rs->next = remembered_state;
 	      remembered_state = rs;
 	      break;
@@ -5846,10 +5877,14 @@ display_debug_frames (struct dwarf_section *section,
 	      if (rs)
 		{
 		  remembered_state = rs->next;
+		  fc->cfa_offset = rs->cfa_offset;
+		  fc->cfa_reg = rs->cfa_reg;
+	          fc->ra = rs->ra;
+	          fc->cfa_exp = rs->cfa_exp;
 		  frame_need_space (fc, rs->ncols - 1);
-		  memcpy (fc->col_type, rs->col_type, rs->ncols);
+		  memcpy (fc->col_type, rs->col_type, rs->ncols * sizeof (* rs->col_type));
 		  memcpy (fc->col_offset, rs->col_offset,
-			  rs->ncols * sizeof (int));
+			  rs->ncols * sizeof (* rs->col_offset));
 		  free (rs->col_type);
 		  free (rs->col_offset);
 		  free (rs);

@@ -16,14 +16,14 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#include "gdb_thread_db.h"
+#include "nat/gdb_thread_db.h"
 #include <signal.h>
 
 #include "gdbthread.h"
 #include "gdb_proc_service.h"
 
 /* Included for ptrace type definitions.  */
-#include "linux-ptrace.h"
+#include "nat/linux-ptrace.h"
 
 #define PTRACE_XFER_TYPE long
 
@@ -153,8 +153,12 @@ struct linux_target_ops
 
   /* Breakpoint and watchpoint related functions.  See target.h for
      comments.  */
-  int (*insert_point) (char type, CORE_ADDR addr, int len);
-  int (*remove_point) (char type, CORE_ADDR addr, int len);
+  int (*supports_z_point_type) (char z_type);
+  int (*insert_point) (enum raw_bkpt_type type, CORE_ADDR addr,
+		       int size, struct raw_breakpoint *bp);
+  int (*remove_point) (enum raw_bkpt_type type, CORE_ADDR addr,
+		       int size, struct raw_breakpoint *bp);
+
   int (*stopped_by_watchpoint) (void);
   CORE_ADDR (*stopped_data_address) (void);
 

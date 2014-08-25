@@ -87,6 +87,15 @@ AC_CHECK_HEADERS(pthread.h)
 
 AC_EXEEXT
 
+if test "${build}" = "${host}" -a "${host}" = "${target}"; then
+   case "${host}" in
+     *gnu*)
+       EXTRA_RULES=read1
+       ;;
+   esac
+fi
+AC_SUBST(EXTRA_RULES)
+
 # We do not include these in our source package.
 if test -f $srcdir/gdb.octeon/Makefile.in; then
   gdb_octeon_makefile=gdb.octeon/Makefile

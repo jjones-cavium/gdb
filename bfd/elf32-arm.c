@@ -2172,7 +2172,7 @@ static const bfd_vma elf32_thumb2_plt0_entry [] =
      an instruction maybe encoded to one or two array elements.  */
   0xf8dfb500,		/* push    {lr}          */
   0x44fee008,		/* ldr.w   lr, [pc, #8]  */
-                        /* add     lr, pc        */
+			/* add     lr, pc        */
   0xff08f85e,		/* ldr.w   pc, [lr, #8]! */
   0x00000000,		/* &GOT[0] - .           */
 };
@@ -2187,7 +2187,7 @@ static const bfd_vma elf32_thumb2_plt_entry [] =
   0x0c00f2c0,		/* movt    ip, #0xNNNN    */
   0xf8dc44fc,           /* add     ip, pc         */
   0xbf00f000            /* ldr.w   pc, [ip]       */
-                        /* nop                    */
+			/* nop                    */
 };
 
 /* The format of the first entry in the procedure linkage table
@@ -2283,6 +2283,8 @@ static const bfd_vma elf32_arm_nacl_plt_entry [] =
 #define THM_MAX_BWD_BRANCH_OFFSET  (-(1 << 22) + 4)
 #define THM2_MAX_FWD_BRANCH_OFFSET (((1 << 24) - 2) + 4)
 #define THM2_MAX_BWD_BRANCH_OFFSET (-(1 << 24) + 4)
+#define THM2_MAX_FWD_COND_BRANCH_OFFSET (((1 << 20) -2) + 4)
+#define THM2_MAX_BWD_COND_BRANCH_OFFSET (-(1 << 20) + 4)
 
 enum stub_insn_type
 {
@@ -3523,6 +3525,18 @@ elf32_arm_copy_indirect_symbol (struct bfd_link_info *info,
   _bfd_elf_link_hash_copy_indirect (info, dir, ind);
 }
 
+/* Destroy an ARM elf linker hash table.  */
+
+static void
+elf32_arm_link_hash_table_free (bfd *obfd)
+{
+  struct elf32_arm_link_hash_table *ret
+    = (struct elf32_arm_link_hash_table *) obfd->link.hash;
+
+  bfd_hash_table_free (&ret->stub_hash_table);
+  _bfd_elf_link_hash_table_free (obfd);
+}
+
 /* Create an ARM elf linker hash table.  */
 
 static struct bfd_link_hash_table *
@@ -3558,23 +3572,12 @@ elf32_arm_link_hash_table_create (bfd *abfd)
   if (!bfd_hash_table_init (&ret->stub_hash_table, stub_hash_newfunc,
 			    sizeof (struct elf32_arm_stub_hash_entry)))
     {
-      free (ret);
+      _bfd_elf_link_hash_table_free (abfd);
       return NULL;
     }
+  ret->root.root.hash_table_free = elf32_arm_link_hash_table_free;
 
   return &ret->root.root;
-}
-
-/* Free the derived linker hash table.  */
-
-static void
-elf32_arm_hash_table_free (struct bfd_link_hash_table *hash)
-{
-  struct elf32_arm_link_hash_table *ret
-    = (struct elf32_arm_link_hash_table *) hash;
-
-  bfd_hash_table_free (&ret->stub_hash_table);
-  _bfd_elf_link_hash_table_free (hash);
 }
 
 /* Determine what kind of NOPs are available.  */
@@ -3666,7 +3669,8 @@ arm_type_of_stub (struct bfd_link_info *info,
 
   /* ST_BRANCH_TO_ARM is nonsense to thumb-only targets when we
      are considering a function call relocation.  */
-  if (thumb_only && (r_type == R_ARM_THM_CALL || r_type == R_ARM_THM_JUMP24)
+  if (thumb_only && (r_type == R_ARM_THM_CALL || r_type == R_ARM_THM_JUMP24
+                     || r_type == R_ARM_THM_JUMP19)
       && branch_type == ST_BRANCH_TO_ARM)
     branch_type = ST_BRANCH_TO_THUMB;
 
@@ -3710,7 +3714,7 @@ arm_type_of_stub (struct bfd_link_info *info,
   branch_offset = (bfd_signed_vma)(destination - location);
 
   if (r_type == R_ARM_THM_CALL || r_type == R_ARM_THM_JUMP24
-      || r_type == R_ARM_THM_TLS_CALL)
+      || r_type == R_ARM_THM_TLS_CALL || r_type == R_ARM_THM_JUMP19)
     {
       /* Handle cases where:
 	 - this call goes too far (different Thumb/Thumb2 max
@@ -3726,10 +3730,15 @@ arm_type_of_stub (struct bfd_link_info *info,
 	  || (thumb2
 	      && (branch_offset > THM2_MAX_FWD_BRANCH_OFFSET
 		  || (branch_offset < THM2_MAX_BWD_BRANCH_OFFSET)))
+	  || (thumb2
+	      && (branch_offset > THM2_MAX_FWD_COND_BRANCH_OFFSET
+		  || (branch_offset < THM2_MAX_BWD_COND_BRANCH_OFFSET))
+	      && (r_type == R_ARM_THM_JUMP19))
 	  || (branch_type == ST_BRANCH_TO_ARM
 	      && (((r_type == R_ARM_THM_CALL
 		    || r_type == R_ARM_THM_TLS_CALL) && !globals->use_blx)
-		  || (r_type == R_ARM_THM_JUMP24))
+		  || (r_type == R_ARM_THM_JUMP24)
+                  || (r_type == R_ARM_THM_JUMP19))
 	      && !use_plt))
 	{
 	  if (branch_type == ST_BRANCH_TO_THUMB)
@@ -4436,7 +4445,7 @@ elf32_arm_setup_section_lists (bfd *output_bfd,
   /* Count the number of input BFDs and find the top input section id.  */
   for (input_bfd = info->input_bfds, bfd_count = 0, top_id = 0;
        input_bfd != NULL;
-       input_bfd = input_bfd->link_next)
+       input_bfd = input_bfd->link.next)
     {
       bfd_count += 1;
       for (section = input_bfd->sections;
@@ -5045,7 +5054,7 @@ elf32_arm_size_stubs (bfd *output_bfd,
       num_a8_fixes = 0;
       for (input_bfd = info->input_bfds, bfd_indx = 0;
 	   input_bfd != NULL;
-	   input_bfd = input_bfd->link_next, bfd_indx++)
+	   input_bfd = input_bfd->link.next, bfd_indx++)
 	{
 	  Elf_Internal_Shdr *symtab_hdr;
 	  asection *section;
@@ -5346,7 +5355,8 @@ elf32_arm_size_stubs (bfd *output_bfd,
 		      /* For historical reasons, use the existing names for
 			 ARM-to-Thumb and Thumb-to-ARM stubs.  */
 		      if ((r_type == (unsigned int) R_ARM_THM_CALL
-			   || r_type == (unsigned int) R_ARM_THM_JUMP24)
+			   || r_type == (unsigned int) R_ARM_THM_JUMP24
+                           || r_type == (unsigned int) R_ARM_THM_JUMP19)
 			  && branch_type == ST_BRANCH_TO_ARM)
 			sprintf (stub_entry->output_name,
 				 THUMB2ARM_GLUE_ENTRY_NAME, sym_name);
@@ -7521,6 +7531,8 @@ elf32_arm_allocate_plt_entry (struct bfd_link_info *info,
 	 first entry.  */
       if (splt->size == 0)
 	splt->size += htab->plt_header_size;
+
+      htab->next_tls_desc_index++;
     }
 
   /* Allocate the PLT entry itself, including any leading Thumb stub.  */
@@ -7533,7 +7545,10 @@ elf32_arm_allocate_plt_entry (struct bfd_link_info *info,
     {
       /* We also need to make an entry in the .got.plt section, which
 	 will be placed in the .got section by the linker script.  */
-      arm_plt->got_offset = sgotplt->size - 8 * htab->num_tls_desc;
+      if (is_iplt_entry)
+	arm_plt->got_offset = sgotplt->size;
+      else
+	arm_plt->got_offset = sgotplt->size - 8 * htab->num_tls_desc;
       sgotplt->size += 4;
     }
 }
@@ -7754,7 +7769,7 @@ elf32_arm_populate_plt_entry (bfd *output_bfd, struct bfd_link_info *info,
       else if (using_thumb_only (htab))
 	{
 	  /* PR ld/16017: Generate thumb only PLT entries.  */
-          if (!using_thumb2 (htab))
+	  if (!using_thumb2 (htab))
 	    {
 	      /* FIXME: We ought to be able to generate thumb-1 PLT
 		 instructions...  */
@@ -9119,6 +9134,9 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 	bfd_signed_vma reloc_signed_max = 0xffffe;
 	bfd_signed_vma reloc_signed_min = -0x100000;
 	bfd_signed_vma signed_check;
+        enum elf32_arm_stub_type stub_type = arm_stub_none;
+	struct elf32_arm_stub_hash_entry *stub_entry;
+	struct elf32_arm_link_hash_entry *hash;
 
 	/* Need to refetch the addend, reconstruct the top three bits,
 	   and squish the two 11 bit pieces together.  */
@@ -9150,8 +9168,25 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 	    *unresolved_reloc_p = FALSE;
 	  }
 
-	/* ??? Should handle interworking?  GCC might someday try to
-	   use this for tail calls.  */
+	hash = (struct elf32_arm_link_hash_entry *)h;
+
+	stub_type = arm_type_of_stub (info, input_section, rel,
+		                      st_type, &branch_type,
+		                      hash, value, sym_sec,
+		                      input_bfd, sym_name);
+	if (stub_type != arm_stub_none)
+	  {
+	    stub_entry = elf32_arm_get_stub_entry (input_section,
+				                   sym_sec, h,
+				                   rel, globals,
+				                   stub_type);
+	    if (stub_entry != NULL)
+	      {
+	        value = (stub_entry->stub_offset
+                        + stub_entry->stub_sec->output_offset
+                        + stub_entry->stub_sec->output_section->vma);
+	      }
+	  }
 
 	relocation = value + signed_addend;
 	relocation -= (input_section->output_section->vma
@@ -10911,7 +10946,7 @@ elf32_arm_fix_exidx_coverage (asection **text_section_order,
 
   /* Walk over all EXIDX sections, and create backlinks from the corrsponding
      text sections.  */
-  for (inp = info->input_bfds; inp != NULL; inp = inp->link_next)
+  for (inp = info->input_bfds; inp != NULL; inp = inp->link.next)
     {
       asection *sec;
 
@@ -12494,7 +12529,7 @@ elf32_arm_gc_sweep_hook (bfd *                     abfd,
 	      && (sec->flags & SEC_ALLOC) != 0)
 	    {
 	      if (h == NULL
-		  && (r_type == R_ARM_REL32 || r_type == R_ARM_REL32_NOI))
+		  && elf32_arm_howto_from_type (r_type)->pc_relative)
 		{
 		  call_reloc_p = TRUE;
 		  may_need_local_target_p = TRUE;
@@ -12705,6 +12740,9 @@ elf32_arm_check_relocs (bfd *abfd, struct bfd_link_info *info,
 		default: tls_type = GOT_NORMAL; break;
 		}
 
+	      if (!info->executable && (tls_type & GOT_TLS_IE))
+		info->flags |= DF_STATIC_TLS;
+
 	      if (h != NULL)
 		{
 		  h->got.refcount++;
@@ -12817,7 +12855,7 @@ elf32_arm_check_relocs (bfd *abfd, struct bfd_link_info *info,
 		&& (sec->flags & SEC_ALLOC) != 0)
 	      {
 		if (h == NULL
-		    && (r_type == R_ARM_REL32 || r_type == R_ARM_REL32_NOI))
+		    && elf32_arm_howto_from_type (r_type)->pc_relative)
 		  {
 		    /* In shared libraries and relocatable executables,
 		       we treat local relative references as calls;
@@ -12963,7 +13001,7 @@ elf32_arm_check_relocs (bfd *abfd, struct bfd_link_info *info,
 	      p->pc_count = 0;
 	    }
 
-	  if (r_type == R_ARM_REL32 || r_type == R_ARM_REL32_NOI)
+	  if (elf32_arm_howto_from_type (r_type)->pc_relative)
 	    p->pc_count += 1;
 	  p->count += 1;
 	}
@@ -12991,7 +13029,7 @@ elf32_arm_gc_mark_extra_sections (struct bfd_link_info *info,
   while (again)
     {
       again = FALSE;
-      for (sub = info->input_bfds; sub != NULL; sub = sub->link_next)
+      for (sub = info->input_bfds; sub != NULL; sub = sub->link.next)
 	{
 	  asection *o;
 
@@ -13359,8 +13397,6 @@ allocate_dynrelocs_for_symbol (struct elf_link_hash_entry *h, void * inf)
 	      h->target_internal = ST_BRANCH_TO_ARM;
 	    }
 
-	  htab->next_tls_desc_index++;
-
 	  /* VxWorks executables have a second set of relocations for
 	     each PLT entry.  They go in a separate relocation section,
 	     which is processed by the kernel loader.  */
@@ -13544,12 +13580,12 @@ allocate_dynrelocs_for_symbol (struct elf_link_hash_entry *h, void * inf)
 
   if (info->shared || htab->root.is_relocatable_executable)
     {
-      /* The only relocs that use pc_count are R_ARM_REL32 and
-	 R_ARM_REL32_NOI, which will appear on something like
-	 ".long foo - .".  We want calls to protected symbols to resolve
-	 directly to the function rather than going via the plt.  If people
-	 want function pointer comparisons to work as expected then they
-	 should avoid writing assembly like ".long foo - .".  */
+      /* Relocs that use pc_count are PC-relative forms, which will appear
+	 on something like ".long foo - ." or "movw REG, foo - .".  We want
+	 calls to protected symbols to resolve directly to the function
+	 rather than going via the plt.  If people want function pointer
+	 comparisons to work as expected then they should avoid writing
+	 assembly like ".long foo - .".  */
       if (SYMBOL_CALLS_LOCAL (info, h))
 	{
 	  struct elf_dyn_relocs **pp;
@@ -13729,7 +13765,7 @@ elf32_arm_size_dynamic_sections (bfd * output_bfd ATTRIBUTE_UNUSED,
 
   /* Set up .got offsets for local syms, and space for local dynamic
      relocs.  */
-  for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
+  for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link.next)
     {
       bfd_signed_vma *local_got;
       bfd_signed_vma *end_local_got;
@@ -13906,7 +13942,7 @@ elf32_arm_size_dynamic_sections (bfd * output_bfd ATTRIBUTE_UNUSED,
   elf_link_hash_traverse (& htab->root, allocate_dynrelocs_for_symbol, info);
 
   /* Here we rummage through the found bfds to collect glue information.  */
-  for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
+  for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link.next)
     {
       if (! is_arm_elf (ibfd))
 	continue;
@@ -15072,7 +15108,7 @@ elf32_arm_output_arch_local_syms (bfd *output_bfd,
      mapping symbols.  */
   for (input_bfd = info->input_bfds;
        input_bfd != NULL;
-       input_bfd = input_bfd->link_next)
+       input_bfd = input_bfd->link.next)
     {
       if ((input_bfd->flags & (BFD_LINKER_CREATED | HAS_SYMS)) == HAS_SYMS)
 	for (osi.sec = input_bfd->sections;
@@ -15230,7 +15266,7 @@ elf32_arm_output_arch_local_syms (bfd *output_bfd,
       elf_link_hash_traverse (&htab->root, elf32_arm_output_plt_map, &osi);
       for (input_bfd = info->input_bfds;
 	   input_bfd != NULL;
-	   input_bfd = input_bfd->link_next)
+	   input_bfd = input_bfd->link.next)
 	{
 	  struct arm_local_iplt_info **local_iplt;
 	  unsigned int i, num_syms;
@@ -16093,7 +16129,7 @@ elf32_arm_get_synthetic_symtab (bfd *abfd,
 #ifdef __QNXTARGET__
 #define ELF_MAXPAGESIZE			0x1000
 #else
-#define ELF_MAXPAGESIZE			0x8000
+#define ELF_MAXPAGESIZE			0x10000
 #endif
 #define ELF_MINPAGESIZE			0x1000
 #define ELF_COMMONPAGESIZE		0x1000
@@ -16105,7 +16141,6 @@ elf32_arm_get_synthetic_symtab (bfd *abfd,
 #define bfd_elf32_bfd_set_private_flags		elf32_arm_set_private_flags
 #define bfd_elf32_bfd_print_private_bfd_data	elf32_arm_print_private_bfd_data
 #define bfd_elf32_bfd_link_hash_table_create    elf32_arm_link_hash_table_create
-#define bfd_elf32_bfd_link_hash_table_free      elf32_arm_hash_table_free
 #define bfd_elf32_bfd_reloc_type_lookup		elf32_arm_reloc_type_lookup
 #define bfd_elf32_bfd_reloc_name_lookup		elf32_arm_reloc_name_lookup
 #define bfd_elf32_find_nearest_line	        elf32_arm_find_nearest_line
@@ -16244,8 +16279,6 @@ elf32_arm_nacl_plt_sym_val (bfd_vma i, const asection *plt,
 #undef  elf_backend_plt_sym_val
 #define elf_backend_plt_sym_val			elf32_arm_nacl_plt_sym_val
 
-#undef	ELF_MAXPAGESIZE
-#define ELF_MAXPAGESIZE			0x10000
 #undef	ELF_MINPAGESIZE
 #undef	ELF_COMMONPAGESIZE
 

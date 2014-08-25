@@ -32,10 +32,10 @@
 #include "value.h"
 #include "command.h"
 #include "inferior.h"
+#include "infrun.h"
 #include "gdbthread.h"
 #include "target.h"
 #include "language.h"
-#include <string.h>
 #include "gdb-demangle.h"
 #include "filenames.h"
 #include "annotate.h"
@@ -47,7 +47,6 @@
 #include "gdb.h"
 #include "ui-out.h"
 #include "cli/cli-script.h"
-#include "gdb_assert.h"
 #include "block.h"
 #include "solib.h"
 #include "solist.h"
@@ -153,7 +152,8 @@ struct breakpoint *set_raw_breakpoint (struct gdbarch *gdbarch,
 static struct breakpoint *
   momentary_breakpoint_from_master (struct breakpoint *orig,
 				    enum bptype type,
-				    const struct breakpoint_ops *ops);
+				    const struct breakpoint_ops *ops,
+				    int loc_enabled);
 
 static void breakpoint_adjustment_warning (CORE_ADDR, CORE_ADDR, int, int);
 
@@ -227,6 +227,9 @@ static void stopat_command (char *arg, int from_tty);
 static void tcatch_command (char *arg, int from_tty);
 
 static void detach_single_step_breakpoints (void);
+
+static int find_single_step_breakpoint (struct address_space *aspace,
+					CORE_ADDR pc);
 
 static void free_bp_location (struct bp_location *loc);
 static void incref_bp_location (struct bp_location *loc);
@@ -2350,13 +2353,25 @@ build_target_command_list (struct bp_location *bl)
   /* Release commands left over from a previous insert.  */
   VEC_free (agent_expr_p, bl->target_info.tcommands);
 
-  /* For now, limit to agent-style dprintf breakpoints.  */
-  if (bl->owner->type != bp_dprintf
-      || strcmp (dprintf_style, dprintf_style_agent) != 0)
-    return;
-
   if (!target_can_run_breakpoint_commands ())
     return;
+
+  /* For now, limit to agent-style dprintf breakpoints.  */
+  if (dprintf_style != dprintf_style_agent)
+    return;
+
+  /* For now, if we have any duplicate location that isn't a dprintf,
+     don't install the target-side commands, as that would make the
+     breakpoint not be reported to the core, and we'd lose
+     control.  */
+  ALL_BP_LOCATIONS_AT_ADDR (loc2p, locp, bl->address)
+    {
+      loc = (*loc2p);
+      if (is_breakpoint (loc->owner)
+	  && loc->pspace->num == bl->pspace->num
+	  && loc->owner->type != bp_dprintf)
+	return;
+    }
 
   /* Do a first pass to check for locations with no assigned
      conditions or conditions that fail to parse to a valid agent expression
@@ -2649,8 +2664,8 @@ insert_bp_location (struct bp_location *bl,
 	  if ((bp_err == GENERIC_ERROR || bp_err == MEMORY_ERROR)
 	      && bl->loc_type == bp_loc_software_breakpoint
 	      && (solib_name_from_address (bl->pspace, bl->address)
-		  || userloaded_objfile_contains_address_p (bl->pspace,
-							    bl->address)))
+		  || shared_objfile_contains_address_p (bl->pspace,
+							bl->address)))
 	    {
 	      /* See also: disable_breakpoints_in_shlibs.  */
 	      bl->shlib_disabled = 1;
@@ -3789,7 +3804,7 @@ remove_breakpoint_1 (struct bp_location *bl, insertion_state_t is)
 	     whether another dynamic object might have loaded over the
 	     breakpoint's address -- the user might well let us know
 	     about it next with add-symbol-file (the whole point of
-	     OBJF_USERLOADED is letting the user manually maintain a
+	     add-symbol-file is letting the user manually maintain a
 	     list of dynamically loaded objects).  If we have the
 	     breakpoint's shadow memory, that is, this is a software
 	     breakpoint managed by GDB, check whether the breakpoint
@@ -3863,8 +3878,8 @@ remove_breakpoint_1 (struct bp_location *bl, insertion_state_t is)
 	  && (bl->loc_type == bp_loc_software_breakpoint
 	      && (bl->shlib_disabled
 		  || solib_name_from_address (bl->pspace, bl->address)
-		  || userloaded_objfile_contains_address_p (bl->pspace,
-							    bl->address))))
+		  || shared_objfile_contains_address_p (bl->pspace,
+							bl->address))))
 	val = 0;
 
       if (val)
@@ -4153,12 +4168,12 @@ breakpoint_inserted_here_p (struct address_space *aspace, CORE_ADDR pc)
   return 0;
 }
 
-/* This function returns non-zero iff there is a software breakpoint
-   inserted at PC.  */
+/* Ignoring deprecated raw breakpoints, return non-zero iff there is a
+   software breakpoint inserted at PC.  */
 
-int
-software_breakpoint_inserted_here_p (struct address_space *aspace,
-				     CORE_ADDR pc)
+static struct bp_location *
+find_non_raw_software_breakpoint_inserted_here (struct address_space *aspace,
+						CORE_ADDR pc)
 {
   struct bp_location *bl, **blp_tmp;
 
@@ -4176,9 +4191,22 @@ software_breakpoint_inserted_here_p (struct address_space *aspace,
 	      && !section_is_mapped (bl->section))
 	    continue;		/* unmapped overlay -- can't be a match */
 	  else
-	    return 1;
+	    return bl;
 	}
     }
+
+  return NULL;
+}
+
+/* This function returns non-zero iff there is a software breakpoint
+   inserted at PC.  */
+
+int
+software_breakpoint_inserted_here_p (struct address_space *aspace,
+				     CORE_ADDR pc)
+{
+  if (find_non_raw_software_breakpoint_inserted_here (aspace, pc) != NULL)
+    return 1;
 
   /* Also check for software single-step breakpoints.  */
   if (single_step_breakpoint_inserted_here_p (aspace, pc))
@@ -7380,7 +7408,7 @@ set_longjmp_breakpoint (struct thread_info *tp, struct frame_id frame)
 	/* longjmp_breakpoint_ops ensures INITIATING_FRAME is cleared again
 	   after their removal.  */
 	clone = momentary_breakpoint_from_master (b, type,
-						  &longjmp_breakpoint_ops);
+						  &longjmp_breakpoint_ops, 1);
 	clone->thread = thread;
       }
 
@@ -7430,7 +7458,8 @@ set_longjmp_breakpoint_for_call_dummy (void)
 	struct breakpoint *new_b;
 
 	new_b = momentary_breakpoint_from_master (b, bp_longjmp_call_dummy,
-						  &momentary_breakpoint_ops);
+						  &momentary_breakpoint_ops,
+						  1);
 	new_b->thread = pid_to_thread_id (inferior_ptid);
 
 	/* Link NEW_B into the chain of RETVAL breakpoints.  */
@@ -7448,7 +7477,7 @@ set_longjmp_breakpoint_for_call_dummy (void)
 }
 
 /* Verify all existing dummy frames and their associated breakpoints for
-   THREAD.  Remove those which can no longer be found in the current frame
+   TP.  Remove those which can no longer be found in the current frame
    stack.
 
    You should call this function only at places where it is safe to currently
@@ -7456,12 +7485,12 @@ set_longjmp_breakpoint_for_call_dummy (void)
    frames.  */
 
 void
-check_longjmp_breakpoint_for_call_dummy (int thread)
+check_longjmp_breakpoint_for_call_dummy (struct thread_info *tp)
 {
   struct breakpoint *b, *b_tmp;
 
   ALL_BREAKPOINTS_SAFE (b, b_tmp)
-    if (b->type == bp_longjmp_call_dummy && b->thread == thread)
+    if (b->type == bp_longjmp_call_dummy && b->thread == tp->num)
       {
 	struct breakpoint *dummy_b = b->related_breakpoint;
 
@@ -7471,7 +7500,7 @@ check_longjmp_breakpoint_for_call_dummy (int thread)
 	    || frame_find_by_id (dummy_b->frame_id) != NULL)
 	  continue;
 	
-	dummy_frame_discard (dummy_b->frame_id);
+	dummy_frame_discard (dummy_b->frame_id, tp->ptid);
 
 	while (b->related_breakpoint != b)
 	  {
@@ -7523,7 +7552,7 @@ set_std_terminate_breakpoint (void)
 	&& b->type == bp_std_terminate_master)
       {
 	momentary_breakpoint_from_master (b, bp_std_terminate,
-					  &momentary_breakpoint_ops);
+					  &momentary_breakpoint_ops, 1);
       }
 }
 
@@ -7719,18 +7748,19 @@ disable_breakpoints_in_freed_objfile (struct objfile *objfile)
   if (objfile == NULL)
     return;
 
-  /* OBJF_USERLOADED are dynamic modules manually managed by the user
-     with add-symbol-file/remove-symbol-file.  Similarly to how
-     breakpoints in shared libraries are handled in response to
-     "nosharedlibrary", mark breakpoints in OBJF_USERLOADED modules
+  /* OBJF_SHARED|OBJF_USERLOADED objfiles are dynamic modules manually
+     managed by the user with add-symbol-file/remove-symbol-file.
+     Similarly to how breakpoints in shared libraries are handled in
+     response to "nosharedlibrary", mark breakpoints in such modules
      shlib_disabled so they end up uninserted on the next global
      location list update.  Shared libraries not loaded by the user
      aren't handled here -- they're already handled in
      disable_breakpoints_in_unloaded_shlib, called by solib.c's
      solib_unloaded observer.  We skip objfiles that are not
-     OBJF_USERLOADED (nor OBJF_SHARED) as those aren't considered
-     dynamic objects (e.g. the main objfile).  */
-  if ((objfile->flags & OBJF_USERLOADED) == 0)
+     OBJF_SHARED as those aren't considered dynamic objects (e.g. the
+     main objfile).  */
+  if ((objfile->flags & OBJF_SHARED) == 0
+      || (objfile->flags & OBJF_USERLOADED) == 0)
     return;
 
   ALL_BREAKPOINTS (b)
@@ -9048,13 +9078,14 @@ set_momentary_breakpoint (struct gdbarch *gdbarch, struct symtab_and_line sal,
 }
 
 /* Make a momentary breakpoint based on the master breakpoint ORIG.
-   The new breakpoint will have type TYPE, and use OPS as it
-   breakpoint_ops.  */
+   The new breakpoint will have type TYPE, use OPS as its
+   breakpoint_ops, and will set enabled to LOC_ENABLED.  */
 
 static struct breakpoint *
 momentary_breakpoint_from_master (struct breakpoint *orig,
 				  enum bptype type,
-				  const struct breakpoint_ops *ops)
+				  const struct breakpoint_ops *ops,
+				  int loc_enabled)
 {
   struct breakpoint *copy;
 
@@ -9070,6 +9101,7 @@ momentary_breakpoint_from_master (struct breakpoint *orig,
   copy->loc->probe = orig->loc->probe;
   copy->loc->line_number = orig->loc->line_number;
   copy->loc->symtab = orig->loc->symtab;
+  copy->loc->enabled = loc_enabled;
   copy->frame_id = orig->frame_id;
   copy->thread = orig->thread;
   copy->pspace = orig->pspace;
@@ -9092,7 +9124,7 @@ clone_momentary_breakpoint (struct breakpoint *orig)
   if (orig == NULL)
     return NULL;
 
-  return momentary_breakpoint_from_master (orig, orig->type, orig->ops);
+  return momentary_breakpoint_from_master (orig, orig->type, orig->ops, 0);
 }
 
 struct breakpoint *
@@ -10105,8 +10137,8 @@ resolve_sal_pc (struct symtab_and_line *sal)
 
   if (sal->section == 0 && sal->symtab != NULL)
     {
-      struct blockvector *bv;
-      struct block *b;
+      const struct blockvector *bv;
+      const struct block *b;
       struct symbol *sym;
 
       bv = blockvector_for_pc_sect (sal->pc, 0, &b, sal->symtab);
@@ -10603,8 +10635,6 @@ watchpoint_exp_is_const (const struct expression *exp)
 	case BINOP_MAX:
 	case BINOP_INTDIV:
 	case BINOP_CONCAT:
-	case BINOP_IN:
-	case BINOP_RANGE:
 	case TERNOP_COND:
 	case TERNOP_SLICE:
 
@@ -11688,7 +11718,7 @@ until_break_command (char *arg, int from_tty, int anywhere)
   int thread;
   struct thread_info *tp;
 
-  clear_proceed_status ();
+  clear_proceed_status (0);
 
   /* Set a breakpoint where the user wants it and at return from
      this function.  */
@@ -13151,6 +13181,19 @@ bkpt_re_set (struct breakpoint *b)
   breakpoint_re_set_default (b);
 }
 
+/* Copy SRC's shadow buffer and whatever else we'd set if we actually
+   inserted DEST, so we can remove it later, in case SRC is removed
+   first.  */
+
+static void
+bp_target_info_copy_insertion_state (struct bp_target_info *dest,
+				     const struct bp_target_info *src)
+{
+  dest->shadow_len = src->shadow_len;
+  memcpy (dest->shadow_contents, src->shadow_contents, src->shadow_len);
+  dest->placed_size = src->placed_size;
+}
+
 static int
 bkpt_insert_location (struct bp_location *bl)
 {
@@ -13159,8 +13202,25 @@ bkpt_insert_location (struct bp_location *bl)
 					   &bl->target_info,
 					   bl->owner->core_number);
   else
-    return target_insert_breakpoint (bl->gdbarch,
-				     &bl->target_info);
+    {
+      struct bp_target_info *bp_tgt = &bl->target_info;
+      int ret;
+      int sss_slot;
+
+      /* There is no need to insert a breakpoint if an unconditional
+	 raw/sss breakpoint is already inserted at that location.  */
+      sss_slot = find_single_step_breakpoint (bp_tgt->placed_address_space,
+					      bp_tgt->placed_address);
+      if (sss_slot >= 0)
+	{
+	  struct bp_target_info *sss_bp_tgt = single_step_breakpoints[sss_slot];
+
+	  bp_target_info_copy_insertion_state (bp_tgt, sss_bp_tgt);
+	  return 0;
+	}
+
+      return target_insert_breakpoint (bl->gdbarch, bp_tgt);
+    }
 }
 
 static int
@@ -13170,7 +13230,19 @@ bkpt_remove_location (struct bp_location *bl)
     return target_remove_mc_hw_breakpoint (bl->gdbarch, &bl->target_info,
 					   bl->owner->core_number);
   else
-    return target_remove_breakpoint (bl->gdbarch, &bl->target_info);
+    {
+      struct bp_target_info *bp_tgt = &bl->target_info;
+      struct address_space *aspace = bp_tgt->placed_address_space;
+      CORE_ADDR address = bp_tgt->placed_address;
+
+      /* Only remove the breakpoint if there is no raw/sss breakpoint
+	 still inserted at this location.  Otherwise, we would be
+	 effectively disabling the raw/sss breakpoint.  */
+      if (single_step_breakpoint_inserted_here_p (aspace, address))
+	return 0;
+
+      return target_remove_breakpoint (bl->gdbarch, bp_tgt);
+    }
 }
 
 static int
@@ -13192,6 +13264,23 @@ bkpt_breakpoint_hit (const struct bp_location *bl,
     return 0;
 
   return 1;
+}
+
+static int
+dprintf_breakpoint_hit (const struct bp_location *bl,
+			struct address_space *aspace, CORE_ADDR bp_addr,
+			const struct target_waitstatus *ws)
+{
+  if (dprintf_style == dprintf_style_agent
+      && target_can_run_breakpoint_commands ())
+    {
+      /* An agent-style dprintf never causes a stop.  If we see a trap
+	 for this address it must be for a breakpoint that happens to
+	 be set at the same address.  */
+      return 0;
+    }
+
+  return bkpt_breakpoint_hit (bl, aspace, bp_addr, ws);
 }
 
 static int
@@ -14751,7 +14840,7 @@ map_breakpoint_numbers (char *args, void (*function) (struct breakpoint *,
 
   while (!state.finished)
     {
-      char *p = state.string;
+      const char *p = state.string;
 
       match = 0;
 
@@ -15162,11 +15251,29 @@ deprecated_insert_raw_breakpoint (struct gdbarch *gdbarch,
 				  struct address_space *aspace, CORE_ADDR pc)
 {
   struct bp_target_info *bp_tgt;
+  struct bp_location *bl;
 
   bp_tgt = XCNEW (struct bp_target_info);
 
   bp_tgt->placed_address_space = aspace;
   bp_tgt->placed_address = pc;
+
+  /* If an unconditional non-raw breakpoint is already inserted at
+     that location, there's no need to insert another.  However, with
+     target-side evaluation of breakpoint conditions, if the
+     breakpoint that is currently inserted on the target is
+     conditional, we need to make it unconditional.  Note that a
+     breakpoint with target-side commands is not reported even if
+     unconditional, so we need to remove the commands from the target
+     as well.  */
+  bl = find_non_raw_software_breakpoint_inserted_here (aspace, pc);
+  if (bl != NULL
+      && VEC_empty (agent_expr_p, bl->target_info.conditions)
+      && VEC_empty (agent_expr_p, bl->target_info.tcommands))
+    {
+      bp_target_info_copy_insertion_state (bp_tgt, &bl->target_info);
+      return bp_tgt;
+    }
 
   if (target_insert_breakpoint (gdbarch, bp_tgt) != 0)
     {
@@ -15185,9 +15292,30 @@ int
 deprecated_remove_raw_breakpoint (struct gdbarch *gdbarch, void *bp)
 {
   struct bp_target_info *bp_tgt = bp;
+  struct address_space *aspace = bp_tgt->placed_address_space;
+  CORE_ADDR address = bp_tgt->placed_address;
+  struct bp_location *bl;
   int ret;
 
-  ret = target_remove_breakpoint (gdbarch, bp_tgt);
+  bl = find_non_raw_software_breakpoint_inserted_here (aspace, address);
+
+  /* Only remove the raw breakpoint if there are no other non-raw
+     breakpoints still inserted at this location.  Otherwise, we would
+     be effectively disabling those breakpoints.  */
+  if (bl == NULL)
+    ret = target_remove_breakpoint (gdbarch, bp_tgt);
+  else if (!VEC_empty (agent_expr_p, bl->target_info.conditions)
+	   || !VEC_empty (agent_expr_p, bl->target_info.tcommands))
+    {
+      /* The target is evaluating conditions, and when we inserted the
+	 software single-step breakpoint, we had made the breakpoint
+	 unconditional and command-less on the target side.  Reinsert
+	 to restore the conditions/commands.  */
+      ret = target_insert_breakpoint (bl->gdbarch, &bl->target_info);
+    }
+  else
+    ret = 0;
+
   xfree (bp_tgt);
 
   return ret;
@@ -15293,12 +15421,12 @@ detach_single_step_breakpoints (void)
 				single_step_breakpoints[i]);
 }
 
-/* Check whether a software single-step breakpoint is inserted at
-   PC.  */
+/* Find the software single-step breakpoint that inserted at PC.
+   Returns its slot if found, and -1 if not found.  */
 
-int
-single_step_breakpoint_inserted_here_p (struct address_space *aspace, 
-					CORE_ADDR pc)
+static int
+find_single_step_breakpoint (struct address_space *aspace,
+			     CORE_ADDR pc)
 {
   int i;
 
@@ -15309,10 +15437,20 @@ single_step_breakpoint_inserted_here_p (struct address_space *aspace,
 	  && breakpoint_address_match (bp_tgt->placed_address_space,
 				       bp_tgt->placed_address,
 				       aspace, pc))
-	return 1;
+	return i;
     }
 
-  return 0;
+  return -1;
+}
+
+/* Check whether a software single-step breakpoint is inserted at
+   PC.  */
+
+int
+single_step_breakpoint_inserted_here_p (struct address_space *aspace,
+					CORE_ADDR pc)
+{
+  return find_single_step_breakpoint (aspace, pc) >= 0;
 }
 
 /* Returns 0 if 'bp' is NOT a syscall catchpoint,
@@ -15973,8 +16111,7 @@ static struct cmd_list_element *tcatch_cmdlist;
 
 void
 add_catch_command (char *name, char *docstring,
-		   void (*sfunc) (char *args, int from_tty,
-				  struct cmd_list_element *command),
+		   cmd_sfunc_ftype *sfunc,
 		   completer_ftype *completer,
 		   void *user_data_catch,
 		   void *user_data_tcatch)
@@ -16010,7 +16147,7 @@ save_command (char *arg, int from_tty)
 {
   printf_unfiltered (_("\"save\" must be followed by "
 		       "the name of a save subcommand.\n"));
-  help_list (save_cmdlist, "save ", -1, gdb_stdout);
+  help_list (save_cmdlist, "save ", all_commands, gdb_stdout);
 }
 
 struct breakpoint *
@@ -16273,6 +16410,7 @@ initialize_breakpoint_ops (void)
   ops->print_mention = bkpt_print_mention;
   ops->print_recreate = dprintf_print_recreate;
   ops->after_condition_true = dprintf_after_condition_true;
+  ops->breakpoint_hit = dprintf_breakpoint_hit;
 }
 
 /* Chain containing all defined "enable breakpoint" subcommands.  */

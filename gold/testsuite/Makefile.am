@@ -517,6 +517,16 @@ two_file_pie_test: two_file_test_1_pie.o two_file_test_1b_pie.o \
 		two_file_test_2_pie.o two_file_test_main_pie.o gcctestdir/ld
 	$(CXXLINK) -Bgcctestdir/ -pie two_file_test_1_pie.o two_file_test_1b_pie.o two_file_test_2_pie.o two_file_test_main_pie.o
 
+check_PROGRAMS += pie_copyrelocs_test
+pie_copyrelocs_test_SOURCES = pie_copyrelocs_test.cc
+pie_copyrelocs_test_DEPENDENCIES = gcctestdir/ld pie_copyrelocs_shared_test.so
+pie_copyrelocs_test_LDFLAGS = -Bgcctestdir/ -Wl,-R,. -pie
+pie_copyrelocs_test_LDADD = pie_copyrelocs_shared_test.so
+pie_copyrelocs_shared_test.o: pie_copyrelocs_shared_test.cc
+	$(CXXCOMPILE) -O2 -fpic -c -o $@ $<
+pie_copyrelocs_shared_test.so: pie_copyrelocs_shared_test.o gcctestdir/ld
+	$(CXXLINK) -Bgcctestdir/ -shared pie_copyrelocs_shared_test.o
+
 check_SCRIPTS += two_file_shared.sh
 check_DATA += two_file_shared.dbg
 MOSTLYCLEANFILES += two_file_shared.dbg
@@ -2231,7 +2241,7 @@ MOSTLYCLEANFILES += ehdr_start_test_4
 ehdr_start_test_4.syms: ehdr_start_test_4
 	$(TEST_NM) ehdr_start_test_4 > $@
 ehdr_start_test_4: ehdr_start_test_4.o gcctestdir/ld
-	$(CXXLINK) -Bgcctestdir/ld/ -Wl,-Ttext=0x100100 $<
+	$(CXXLINK) -Bgcctestdir/ -Wl,-Ttext=0x100100 $<
 ehdr_start_test_4.o: ehdr_start_test.cc
 	$(CXXCOMPILE) -c -DEHDR_START_WEAK -o $@ $<
 
@@ -2242,6 +2252,17 @@ ehdr_start_test_5_DEPENDENCIES = gcctestdir/ld
 ehdr_start_test_5_CXXFLAGS = -DEHDR_START_USER_DEF
 ehdr_start_test_5_LDFLAGS = -Bgcctestdir/
 ehdr_start_test_5_LDADD =
+
+# Test that the --defsym option copies the symbol type and visibility.
+check_SCRIPTS += defsym_test.sh
+check_DATA += defsym_test.syms
+MOSTLYCLEANFILES += defsym_test.syms
+defsym_test.syms: defsym_test
+	$(TEST_READELF) -sW $< > $@
+defsym_test: defsym_test.o gcctestdir/ld
+	$(LINK) -Bgcctestdir/ -Wl,--defsym=bar=foo defsym_test.o
+defsym_test.o: defsym_test.c
+	$(COMPILE) -c -o $@ $<
 
 # End-to-end incremental linking tests.
 # Incremental linking is currently supported only on the x86_64 target.

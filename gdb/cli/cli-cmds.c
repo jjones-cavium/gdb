@@ -27,7 +27,6 @@
 #include "target.h"	/* For baud_rate, remote_debug and remote_timeout.  */
 #include "gdb_wait.h"	/* For shell escape implementation.  */
 #include "gdb_regex.h"	/* Used by apropos_command.  */
-#include <string.h>
 #include "gdb_vfork.h"
 #include "linespec.h"
 #include "expression.h"
@@ -204,7 +203,7 @@ static const char *script_ext_mode = script_ext_soft;
    none is supplied.  */
 
 void
-error_no_arg (char *why)
+error_no_arg (const char *why)
 {
   error (_("Argument required (%s)."), why);
 }
@@ -218,7 +217,7 @@ info_command (char *arg, int from_tty)
 {
   printf_unfiltered (_("\"info\" must be followed by "
 		       "the name of an info command.\n"));
-  help_list (infolist, "info ", -1, gdb_stdout);
+  help_list (infolist, "info ", all_commands, gdb_stdout);
 }
 
 /* The "show" command with no arguments shows all the settings.  */
@@ -874,6 +873,27 @@ list_command (char *arg, int from_tty)
     {
       set_default_source_symtab_and_line ();
       cursal = get_current_source_symtab_and_line ();
+
+      /* If this is the first "list" since we've set the current
+	 source line, center the listing around that line.  */
+      if (get_first_line_listed () == 0)
+	{
+	  int first;
+
+	  first = max (cursal.line - get_lines_to_list () / 2, 1);
+
+	  /* A small special case --- if listing backwards, and we
+	     should list only one line, list the preceding line,
+	     instead of the exact line we've just shown after e.g.,
+	     stopping for a breakpoint.  */
+	  if (arg != NULL && arg[0] == '-'
+	      && get_lines_to_list () == 1 && first > 1)
+	    first -= 1;
+
+	  print_source_lines (cursal.symtab, first,
+			      first + get_lines_to_list (), 0);
+	  return;
+	}
     }
 
   /* "l" or "l +" lists next ten lines.  */
@@ -1546,7 +1566,7 @@ set_debug (char *arg, int from_tty)
 {
   printf_unfiltered (_("\"set debug\" must be followed by "
 		       "the name of a debug subcommand.\n"));
-  help_list (setdebuglist, "set debug ", -1, gdb_stdout);
+  help_list (setdebuglist, "set debug ", all_commands, gdb_stdout);
 }
 
 static void

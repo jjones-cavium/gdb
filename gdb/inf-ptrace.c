@@ -24,9 +24,6 @@
 #include "terminal.h"
 #include "gdbcore.h"
 #include "regcache.h"
-
-#include "gdb_assert.h"
-#include <string.h>
 #include "gdb_ptrace.h"
 #include "gdb_wait.h"
 #include <signal.h>
@@ -174,17 +171,14 @@ inf_ptrace_mourn_inferior (struct target_ops *ops)
      only report its exit status to its original parent.  */
   waitpid (ptid_get_pid (inferior_ptid), &status, 0);
 
-  generic_mourn_inferior ();
-
-  if (!have_inferiors ())
-    unpush_target (ops);
+  inf_child_mourn_inferior (ops);
 }
 
 /* Attach to the process specified by ARGS.  If FROM_TTY is non-zero,
    be chatty about it.  */
 
 static void
-inf_ptrace_attach (struct target_ops *ops, char *args, int from_tty)
+inf_ptrace_attach (struct target_ops *ops, const char *args, int from_tty)
 {
   char *exec_file;
   pid_t pid;
@@ -297,8 +291,7 @@ inf_ptrace_detach (struct target_ops *ops, const char *args, int from_tty)
   inferior_ptid = null_ptid;
   detach_inferior (pid);
 
-  if (!have_inferiors ())
-    unpush_target (ops);
+  inf_child_maybe_unpush_target (ops);
 }
 
 /* Kill the inferior.  */

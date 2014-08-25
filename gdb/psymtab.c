@@ -21,7 +21,6 @@
 #include "symtab.h"
 #include "psympriv.h"
 #include "objfiles.h"
-#include "gdb_assert.h"
 #include "block.h"
 #include "filenames.h"
 #include "source.h"
@@ -517,7 +516,7 @@ lookup_symbol_aux_psymtabs (struct objfile *objfile,
 	   information (but NAME might contain it).  */
 	if (stab->primary)
 	  {
-	    struct blockvector *bv = BLOCKVECTOR (stab);
+	    const struct blockvector *bv = BLOCKVECTOR (stab);
 	    struct block *block = BLOCKVECTOR_BLOCK (bv, block_index);
 
 	    sym = lookup_block_symbol (block, name, domain);
@@ -594,7 +593,8 @@ match_partial_symbol (struct objfile *objfile,
       while (top <= real_top
 	     && match (SYMBOL_SEARCH_NAME (*top), name) == 0)
 	{
-	  if (SYMBOL_DOMAIN (*top) == domain)
+	  if (symbol_matches_domain (SYMBOL_LANGUAGE (*top),
+				     SYMBOL_DOMAIN (*top), domain))
 	    return *top;
 	  top++;
 	}
@@ -607,7 +607,8 @@ match_partial_symbol (struct objfile *objfile,
     {
       for (psym = start; psym < start + length; psym++)
 	{
-	  if (SYMBOL_DOMAIN (*psym) == domain
+	  if (symbol_matches_domain (SYMBOL_LANGUAGE (*psym),
+				     SYMBOL_DOMAIN (*psym), domain)
 	      && match (SYMBOL_SEARCH_NAME (*psym), name) == 0)
 	    return *psym;
 	}
@@ -723,7 +724,8 @@ lookup_partial_symbol (struct objfile *objfile,
 
       while (top <= real_top && SYMBOL_MATCHES_SEARCH_NAME (*top, search_name))
 	{
-	  if (SYMBOL_DOMAIN (*top) == domain)
+	  if (symbol_matches_domain (SYMBOL_LANGUAGE (*top),
+				     SYMBOL_DOMAIN (*top), domain))
 	    {
 	      do_cleanups (cleanup);
 	      return (*top);
@@ -739,7 +741,8 @@ lookup_partial_symbol (struct objfile *objfile,
     {
       for (psym = start; psym < start + length; psym++)
 	{
-	  if (SYMBOL_DOMAIN (*psym) == domain
+	  if (symbol_matches_domain (SYMBOL_LANGUAGE (*psym),
+				     SYMBOL_DOMAIN (*psym), domain)
 	      && SYMBOL_MATCHES_SEARCH_NAME (*psym, search_name))
 	    {
 	      do_cleanups (cleanup);
@@ -1219,7 +1222,8 @@ map_block (const char *name, domain_enum namespace, struct objfile *objfile,
   for (sym = block_iter_match_first (block, name, match, &iter);
        sym != NULL; sym = block_iter_match_next (name, match, &iter))
     {
-      if (SYMBOL_DOMAIN (sym) == namespace)
+      if (symbol_matches_domain (SYMBOL_LANGUAGE (sym), 
+				 SYMBOL_DOMAIN (sym), namespace))
 	{
 	  if (callback (block, sym, data))
 	    return 1;
@@ -1998,7 +2002,7 @@ maintenance_check_psymtabs (char *ignore, int from_tty)
   struct partial_symbol **psym;
   struct symtab *s = NULL;
   struct partial_symtab *ps;
-  struct blockvector *bv;
+  const struct blockvector *bv;
   struct objfile *objfile;
   struct block *b;
   int length;

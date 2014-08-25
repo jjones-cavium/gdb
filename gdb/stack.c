@@ -49,10 +49,7 @@
 #include "cli/cli-utils.h"
 #include "objfiles.h"
 
-#include "gdb_assert.h"
 #include <ctype.h>
-#include <string.h>
-
 #include "symfile.h"
 #include "extension.h"
 
@@ -166,12 +163,10 @@ print_stack_frame (struct frame_info *frame, int print_level,
 
   TRY_CATCH (e, RETURN_MASK_ERROR)
     {
-      int center = (print_what == SRC_LINE || print_what == SRC_AND_LOC);
-
       print_frame_info (frame, print_level, print_what, 1 /* print_args */,
 			set_current_sal);
       if (set_current_sal)
-	set_current_sal_from_frame (frame, center);
+	set_current_sal_from_frame (frame);
     }
 }
 
@@ -387,9 +382,12 @@ read_frame_arg (struct symbol *sym, struct frame_info *frame,
 	    {
 	      struct type *type = value_type (val);
 
-	      if (!value_optimized_out (val)
-		  && value_available_contents_eq (val, 0, entryval, 0,
-						  TYPE_LENGTH (type)))
+	      if (value_lazy (val))
+		value_fetch_lazy (val);
+	      if (value_lazy (entryval))
+		value_fetch_lazy (entryval);
+
+	      if (value_contents_eq (val, 0, entryval, 0, TYPE_LENGTH (type)))
 		{
 		  /* Initialize it just to avoid a GCC false warning.  */
 		  struct value *val_deref = NULL, *entryval_deref;
@@ -415,9 +413,9 @@ read_frame_arg (struct symbol *sym, struct frame_info *frame,
 		      /* If the reference addresses match but dereferenced
 			 content does not match print them.  */
 		      if (val != val_deref
-			  && value_available_contents_eq (val_deref, 0,
-							  entryval_deref, 0,
-						      TYPE_LENGTH (type_deref)))
+			  && value_contents_eq (val_deref, 0,
+						entryval_deref, 0,
+						TYPE_LENGTH (type_deref)))
 			val_equal = 1;
 		    }
 
@@ -540,7 +538,7 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
 
   if (func)
     {
-      struct block *b = SYMBOL_BLOCK_VALUE (func);
+      const struct block *b = SYMBOL_BLOCK_VALUE (func);
       struct block_iterator iter;
       struct symbol *sym;
 
@@ -716,17 +714,13 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
    line is in the center of the next 'list'.  */
 
 void
-set_current_sal_from_frame (struct frame_info *frame, int center)
+set_current_sal_from_frame (struct frame_info *frame)
 {
   struct symtab_and_line sal;
 
   find_frame_sal (frame, &sal);
-  if (sal.symtab)
-    {
-      if (center)
-        sal.line = max (sal.line - get_lines_to_list () / 2, 1);
-      set_current_source_symtab_and_line (&sal);
-    }
+  if (sal.symtab != NULL)
+    set_current_source_symtab_and_line (&sal);
 }
 
 /* If ON, GDB will display disassembly of the next source line when
@@ -1535,7 +1529,7 @@ frame_info (char *addr_exp, int from_tty)
       reason = get_frame_unwind_stop_reason (fi);
       if (reason != UNWIND_NO_REASON)
 	printf_filtered (_(" Outermost frame: %s\n"),
-			 frame_stop_reason_string (reason));
+			 frame_stop_reason_string (fi));
     }
   else if (get_frame_type (fi) == TAILCALL_FRAME)
     puts_filtered (" tail call frame");
@@ -1854,7 +1848,7 @@ backtrace_command_1 (char *count_exp, int show_locals, int no_filters,
 	  reason = get_frame_unwind_stop_reason (trailing);
 	  if (reason >= UNWIND_FIRST_ERROR)
 	    printf_filtered (_("Backtrace stopped: %s\n"),
-			     frame_stop_reason_string (reason));
+			     frame_stop_reason_string (trailing));
 	}
     }
 }
@@ -1934,7 +1928,7 @@ backtrace_full_command (char *arg, int from_tty)
    CB_DATA.  */
 
 static void
-iterate_over_block_locals (struct block *b,
+iterate_over_block_locals (const struct block *b,
 			   iterate_over_block_arg_local_vars_cb cb,
 			   void *cb_data)
 {
@@ -2017,7 +2011,7 @@ print_block_frame_labels (struct gdbarch *gdbarch, struct block *b,
    superblocks, stopping when the top-level block is reached.  */
 
 void
-iterate_over_block_local_vars (struct block *block,
+iterate_over_block_local_vars (const struct block *block,
 			       iterate_over_block_arg_local_vars_cb cb,
 			       void *cb_data)
 {
@@ -2079,7 +2073,7 @@ print_frame_local_vars (struct frame_info *frame, int num_tabs,
 			struct ui_file *stream)
 {
   struct print_variable_and_value_data cb_data;
-  struct block *block;
+  const struct block *block;
   CORE_ADDR pc;
 
   if (!get_frame_pc_if_available (frame, &pc))
@@ -2124,7 +2118,7 @@ locals_info (char *args, int from_tty)
    Returns 1 if any argument was walked; 0 otherwise.  */
 
 void
-iterate_over_block_arg_vars (struct block *b,
+iterate_over_block_arg_vars (const struct block *b,
 			     iterate_over_block_arg_local_vars_cb cb,
 			     void *cb_data)
 {
@@ -2227,7 +2221,7 @@ select_and_print_frame (struct frame_info *frame)
    code address within the block returned.  We use this to decide
    which macros are in scope.  */
 
-struct block *
+const struct block *
 get_selected_block (CORE_ADDR *addr_in_block)
 {
   if (!has_stack_frames ())
@@ -2310,7 +2304,7 @@ current_frame_command (char *level_exp, int from_tty)
    previously selected frame, and print it briefly.  */
 
 static void
-up_silently_base (char *count_exp)
+up_silently_base (const char *count_exp)
 {
   struct frame_info *frame;
   int count = 1;
@@ -2341,7 +2335,7 @@ up_command (char *count_exp, int from_tty)
    selected frame, and print it briefly.  */
 
 static void
-down_silently_base (char *count_exp)
+down_silently_base (const char *count_exp)
 {
   struct frame_info *frame;
   int count = -1;

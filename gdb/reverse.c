@@ -18,13 +18,13 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
-#include <string.h>
 #include "target.h"
 #include "top.h"
 #include "cli/cli-cmds.h"
 #include "cli/cli-decode.h"
 #include "cli/cli-utils.h"
 #include "inferior.h"
+#include "infrun.h"
 #include "regcache.h"
 
 /* User interface:

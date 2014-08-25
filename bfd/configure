@@ -1437,7 +1437,7 @@ Optional Features:
   --enable-fast-install[=PKGS]
                           optimize for fast installation [default=yes]
   --disable-libtool-lock  avoid locking (might break parallel builds)
-  --enable-plugins        Enable support for plugins (defaults no)
+  --enable-plugins        Enable support for plugins
   --disable-largefile     omit support for large files
   --enable-64-bit-bfd     64-bit support (on hosts with narrower word sizes)
   --enable-targets        alternative target configurations
@@ -11780,17 +11780,106 @@ CC="$lt_save_CC"
 # even in directories otherwise not depending on the $plugins option.
 
 
-# Check whether --enable-plugins was given.
-if test "${enable_plugins+set}" = set; then :
-  enableval=$enable_plugins; case "${enableval}" in
-  yes | "") plugins=yes ;;
-  no) plugins=no ;;
-  *) plugins=yes ;;
- esac
-else
-  plugins=no
+  maybe_plugins=no
+  for ac_header in dlfcn.h
+do :
+  ac_fn_c_check_header_compile "$LINENO" "dlfcn.h" "ac_cv_header_dlfcn_h" "$ac_includes_default
+"
+if test "x$ac_cv_header_dlfcn_h" = x""yes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_DLFCN_H 1
+_ACEOF
+ maybe_plugins=yes
 fi
 
+done
+
+  for ac_header in windows.h
+do :
+  ac_fn_c_check_header_compile "$LINENO" "windows.h" "ac_cv_header_windows_h" "$ac_includes_default
+"
+if test "x$ac_cv_header_windows_h" = x""yes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_WINDOWS_H 1
+_ACEOF
+ maybe_plugins=yes
+fi
+
+done
+
+
+  # Check whether --enable-plugins was given.
+if test "${enable_plugins+set}" = set; then :
+  enableval=$enable_plugins; case "${enableval}" in
+      no) plugins=no ;;
+      *) plugins=yes
+         if test "$maybe_plugins" != "yes" ; then
+	   as_fn_error "Building with plugin support requires a host that supports dlopen." "$LINENO" 5
+	 fi ;;
+     esac
+else
+  plugins=$maybe_plugins
+
+fi
+
+  if test "$plugins" = "yes"; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing dlopen" >&5
+$as_echo_n "checking for library containing dlopen... " >&6; }
+if test "${ac_cv_search_dlopen+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char dlopen ();
+int
+main ()
+{
+return dlopen ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' dl; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_dlopen=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if test "${ac_cv_search_dlopen+set}" = set; then :
+  break
+fi
+done
+if test "${ac_cv_search_dlopen+set}" = set; then :
+
+else
+  ac_cv_search_dlopen=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_dlopen" >&5
+$as_echo "$ac_cv_search_dlopen" >&6; }
+ac_res=$ac_cv_search_dlopen
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+fi
+
+  fi
 
 
 case "${host}" in
@@ -12016,10 +12105,6 @@ fi
 
 
 if test "$plugins" = "yes"; then
-  if test "$enable_dlopen" != "yes" ; then
-    as_fn_error "
-      Building BFD with plugin support requires a host that supports -ldl." "$LINENO" 5
-  fi
   enable_targets="$enable_targets plugin"
 fi
 
@@ -12182,6 +12267,9 @@ fi
 
 
 
+# Set the 'development' global.
+. $srcdir/../bfd/development.sh
+
 GCC_WARN_CFLAGS="-W -Wall -Wstrict-prototypes -Wmissing-prototypes"
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
@@ -12216,8 +12304,8 @@ case "${host}" in
   *) ;;
 esac
 
-# Enable -Werror by default when using gcc
-if test "${GCC}" = yes -a -z "${ERROR_ON_WARNING}" ; then
+# Enable -Werror by default when using gcc.  Turn it off for releases.
+if test "${GCC}" = yes -a -z "${ERROR_ON_WARNING}" -a "$development" = true ; then
     ERROR_ON_WARNING=yes
 fi
 
@@ -13551,21 +13639,6 @@ if test "$ac_res" != no; then :
 fi
 
 fi
-
-
-for ac_header in windows.h dlfcn.h
-do :
-  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
-ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
-eval as_val=\$$as_ac_Header
-   if test "x$as_val" = x""yes; then :
-  cat >>confdefs.h <<_ACEOF
-#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
-_ACEOF
-
-fi
-
-done
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether string.h and strings.h may both be included" >&5

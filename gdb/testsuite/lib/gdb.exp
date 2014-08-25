@@ -27,6 +27,7 @@ if {$tool == ""} {
 
 load_lib libgloss.exp
 load_lib cache.exp
+load_lib gdb-utils.exp
 
 global GDB
 
@@ -68,6 +69,9 @@ global gdb_prompt
 if ![info exists gdb_prompt] then {
     set gdb_prompt "\[(\]gdb\[)\]"
 }
+
+# A regexp that matches the pagination prompt.
+set pagination_prompt [string_to_regexp "---Type <return> to continue, or q <return> to quit---"]
 
 # The variable fullname_syntax_POSIX is a regexp which matches a POSIX 
 # absolute path ie. /foo/ 
@@ -209,8 +213,8 @@ proc delete_breakpoints {} {
 proc gdb_run_cmd {args} {
     global gdb_prompt use_gdb_stub
 
-    if [target_info exists gdb_init_command] {
-	send_gdb "[target_info gdb_init_command]\n"
+    foreach command [gdb_init_commands] {
+	send_gdb "$command\n"
 	gdb_expect 30 {
 	    -re "$gdb_prompt $" { }
 	    default {
@@ -311,8 +315,8 @@ proc gdb_run_cmd {args} {
 proc gdb_start_cmd {args} {
     global gdb_prompt use_gdb_stub
 
-    if [target_info exists gdb_init_command] {
-	send_gdb "[target_info gdb_init_command]\n"
+    foreach command [gdb_init_commands] {
+	send_gdb "$command\n"
 	gdb_expect 30 {
 	    -re "$gdb_prompt $" { }
 	    default {
@@ -645,7 +649,7 @@ proc gdb_internal_error_resync {} {
 #
 proc gdb_test_multiple { command message user_code } {
     global verbose use_gdb_stub
-    global gdb_prompt
+    global gdb_prompt pagination_prompt
     global GDB
     global inferior_exited_re
     upvar timeout timeout
@@ -869,7 +873,7 @@ proc gdb_test_multiple { command message user_code } {
 	    }
 	    set result 1
 	}
-	"<return>" {
+	-re "$pagination_prompt" {
 	    send_gdb "\n"
 	    perror "Window too small."
 	    fail "$message"
@@ -1105,14 +1109,6 @@ proc test_print_reject { args } {
     }
 }
 
-# Given an input string, adds backslashes as needed to create a
-# regexp that will match the string.
-
-proc string_to_regexp {str} {
-    set result $str
-    regsub -all {[]*+.|()^$\[\\]} $str {\\&} result
-    return $result
-}
 
 # Same as gdb_test, but the second parameter is not a regexp,
 # but a string that must match exactly.
@@ -1204,6 +1200,27 @@ proc gdb_test_list_exact { cmd name elm_find_regexp elm_extract_regexp result_ma
     }
 }
 
+
+# Issue a PASS and return true if evaluating CONDITION in the caller's
+# frame returns true, and issue a FAIL and return false otherwise.
+# MESSAGE is the pass/fail message to be printed.  If MESSAGE is
+# omitted or is empty, then the pass/fail messages use the condition
+# string as the message.
+
+proc gdb_assert { condition {message ""} } {
+    if { $message == ""} {
+	set message $condition
+    }
+
+    set res [uplevel 1 expr $condition]
+    if {!$res} {
+	fail $message
+    } else {
+	pass $message
+    }
+    return $res
+}
+
 proc gdb_reinitialize_dir { subdir } {
     global gdb_prompt
 
@@ -1404,19 +1421,12 @@ proc gdb_file_cmd { arg } {
     }
 }
 
-#
-# start gdb -- start gdb running, default procedure
-#
-# When running over NFS, particularly if running many simultaneous
-# tests on different hosts all using the same server, things can
-# get really slow.  Give gdb at least 3 minutes to start up.
-#
-proc default_gdb_start { } {
-    global verbose use_gdb_stub
+# Default gdb_spawn procedure.
+
+proc default_gdb_spawn { } {
+    global use_gdb_stub
     global GDB
     global INTERNAL_GDBFLAGS GDBFLAGS
-    global gdb_prompt
-    global timeout
     global gdb_spawn_id
 
     gdb_stop_suppressing_tests
@@ -1447,21 +1457,45 @@ proc default_gdb_start { } {
 	perror "Spawning $GDB failed."
 	return 1
     }
+    set gdb_spawn_id -1
+    return 0
+}
+
+# Default gdb_start procedure.
+
+proc default_gdb_start { } {
+    global gdb_prompt
+    global gdb_spawn_id
+
+    if [info exists gdb_spawn_id] {
+	return 0
+    }
+
+    set res [gdb_spawn]
+    if { $res != 0} {
+	return $res
+    }
+
+    # When running over NFS, particularly if running many simultaneous
+    # tests on different hosts all using the same server, things can
+    # get really slow.  Give gdb at least 3 minutes to start up.
     gdb_expect 360 {
 	-re "\[\r\n\]$gdb_prompt $" {
 	    verbose "GDB initialized."
 	}
 	-re "$gdb_prompt $"	{
 	    perror "GDB never initialized."
+	    unset gdb_spawn_id
 	    return -1
 	}
 	timeout	{
 	    perror "(timeout) GDB never initialized after 10 seconds."
 	    remote_close host
+	    unset gdb_spawn_id
 	    return -1
 	}
     }
-    set gdb_spawn_id -1
+
     # force the height to "unlimited", so no pagers get used
 
     send_gdb "set height 0\n"
@@ -1910,6 +1944,24 @@ gdb_caching_proc is_elf_target {
 
     verbose "$me:  returning 1" 2
     return 1
+}
+
+# Return 1 if the memory at address zero is readable.
+
+gdb_caching_proc is_address_zero_readable {
+    global gdb_prompt
+
+    set ret 0
+    gdb_test_multiple "x 0" "" {
+	-re "Cannot access memory at address 0x0.*$gdb_prompt $" {
+	    set ret 0
+	}
+	-re ".*$gdb_prompt $" {
+	    set ret 1
+	}
+    }
+
+    return $ret
 }
 
 # Produce source file NAME and write SOURCES into it.
@@ -3264,6 +3316,23 @@ proc gdb_clear_suppressed { } {
     set suppress_flag 0
 }
 
+# Spawn the gdb process.
+#
+# This doesn't expect any output or do any other initialization,
+# leaving those to the caller.
+#
+# Overridable function -- you can override this function in your
+# baseboard file.
+
+proc gdb_spawn { } {
+    default_gdb_spawn
+}
+
+# Start gdb running, wait for prompt, and disable the pagers.
+
+# Overridable function -- you can override this function in your
+# baseboard file.
+
 proc gdb_start { } {
     default_gdb_start
 }
@@ -3332,12 +3401,6 @@ proc gdb_gcore_cmd {core test} {
 	    pass $test
 	    set result 1
 	}
-
-	-re "Undefined command.*$gdb_prompt $" {
-	    unsupported $test
-	    verbose -log "'gcore' command undefined in gdb_gcore_cmd"
-	}
-
 	-re "(?:Can't create a corefile|Target does not support core file generation\\.)\[\r\n\]+$gdb_prompt $" {
 	    unsupported $test
 	}
@@ -3519,17 +3582,18 @@ proc gdb_continue { function } {
     return [gdb_test "continue" ".*Breakpoint $decimal, $function .*" "continue to $function"]
 }
 
-proc default_gdb_init { args } {
+proc default_gdb_init { test_file_name } {
     global gdb_wrapper_initialized
     global gdb_wrapper_target
     global gdb_test_file_name
     global cleanfiles
+    global pf_prefix
     
     set cleanfiles {}
 
     gdb_clear_suppressed
 
-    set gdb_test_file_name [file rootname [file tail [lindex $args 0]]]
+    set gdb_test_file_name [file rootname [file tail $test_file_name]]
 
     # Make sure that the wrapper is rebuilt
     # with the appropriate multilib option.
@@ -3539,19 +3603,15 @@ proc default_gdb_init { args } {
     
     # Unlike most tests, we have a small number of tests that generate
     # a very large amount of output.  We therefore increase the expect
-    # buffer size to be able to contain the entire test output.
-    match_max -d 30000
+    # buffer size to be able to contain the entire test output.  This
+    # is especially needed by gdb.base/info-macros.exp.
+    match_max -d 65536
     # Also set this value for the currently running GDB. 
     #match_max [match_max -d]
 
     # We want to add the name of the TCL testcase to the PASS/FAIL messages.
-    if { [llength $args] > 0 } {
-	global pf_prefix
+    set pf_prefix "[file tail [file dirname $test_file_name]]/[file tail $test_file_name]:"
 
-	set file [lindex $args 0]
-
-	set pf_prefix "[file tail [file dirname $file]]/[file tail $file]:"
-    }
     global gdb_prompt
     if [target_info exists gdb_prompt] {
 	set gdb_prompt [target_info gdb_prompt]
@@ -3687,13 +3747,18 @@ set banned_procedures { strace }
 # if the banned variables and procedures are already traced.
 set banned_traced 0
 
-proc gdb_init { args } {
+proc gdb_init { test_file_name } {
     # Reset the timeout value to the default.  This way, any testcase
     # that changes the timeout value without resetting it cannot affect
     # the timeout used in subsequent testcases.
     global gdb_test_timeout
     global timeout
     set timeout $gdb_test_timeout
+
+    if { [regexp ".*gdb\.reverse\/.*" $test_file_name]
+	 && [target_info exists gdb_reverse_timeout] } {
+	set timeout [target_info gdb_reverse_timeout]
+    }
 
     # If GDB_INOTIFY is given, check for writes to '.'.  This is a
     # debugging tool to help confirm that the test suite is
@@ -3766,7 +3831,7 @@ proc gdb_init { args } {
     set gdbserver_reconnect_p 1
     unset gdbserver_reconnect_p
 
-    return [eval default_gdb_init $args]
+    return [default_gdb_init $test_file_name]
 }
 
 proc gdb_finish { } {
@@ -4769,6 +4834,20 @@ proc parse_args { argset } {
 
     # The remaining args should be checked to see that they match the
     # number of items expected to be passed into the procedure...
+}
+
+# Capture the output of COMMAND in a string ignoring PREFIX; return that string.
+proc capture_command_output { command prefix } {
+    global gdb_prompt
+    global expect_out
+
+    set output_string ""
+    gdb_test_multiple "$command" "capture_command_output for $command" {
+	-re "${command}\[\r\n\]+${prefix}(.*)\[\r\n\]+$gdb_prompt $" {
+	    set output_string $expect_out(1,string)
+	}
+    }
+    return $output_string
 }
 
 # Always load compatibility stuff.
