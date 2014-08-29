@@ -455,7 +455,7 @@ srec_scan (bfd *abfd)
 	  {
 	    file_ptr pos;
 	    char hdr[3];
-	    unsigned int bytes;
+	    unsigned int bytes, min_bytes;
 	    bfd_vma address;
 	    bfd_byte *data;
 	    unsigned char check_sum;
@@ -478,6 +478,19 @@ srec_scan (bfd *abfd)
 	      }
 
 	    check_sum = bytes = HEX (hdr + 1);
+	    min_bytes = 3;
+	    if (hdr[0] == '2' || hdr[0] == '8')
+	      min_bytes = 4;
+	    else if (hdr[0] == '3' || hdr[0] == '7')
+	      min_bytes = 5;
+	    if (bytes < min_bytes)
+	      {
+		(*_bfd_error_handler) (_("%B:%d: byte count %d too small\n"),
+				       abfd, lineno, bytes);
+		bfd_set_error (bfd_error_bad_value);
+		goto error_return;
+	      }
+
 	    if (bytes * 2 > bufsize)
 	      {
 		if (buf != NULL)

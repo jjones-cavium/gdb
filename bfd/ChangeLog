@@ -1,3 +1,8 @@
+2014-08-29  Alan Modra  <amodra@gmail.com>
+
+	* srec.c (srec_scan): Revert last change.  Report an error for
+	S-records with less than the miniumum byte count.
+
 2013-03-08  Venkataramanan Kumar  <venkataramanan.kumar@linaro.org>
 
         * elf64-aarch64.c (elf_backend_can_gc_sections): Enable gc-section
