@@ -1,3 +1,11 @@
+2014-09-06  Andrew Pinski <apinski@cavium.com>
+
+	Bug #10648
+	Grab from https://sourceware.org/ml/gdb-patches/2014-08/msg00567.html
+
+	* findvar.c (address_from_register): Handle targets requiring
+	a special conversion routine even for plain pointer types.
+
 2014-03-23  Andrew Pinski <apinski@cavium.com>
 
 	* remote-octeon.c (octeon_xfer_partial): Fix return value when
