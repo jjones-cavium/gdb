@@ -75,7 +75,7 @@ static int set_step_all (int);
 static int set_step_isr (int);
 static int puts_octeondebug (char *);
 static int readchar (int);
-static int send_command_get_int_reply_generic (char *, char *, int);
+static unsigned long long send_command_get_int_reply_generic (char *, char *, int);
 static void set_performance_counter0_event (char *, int, 
 					    struct cmd_list_element *c);
 static void set_performance_counter1_event (char *, int, 
@@ -101,7 +101,7 @@ static int octeon_stepisr = 1;
    0,3,4.  */
 static char *mask_cores = NULL;
 /* The mask of the cores that are enabled for debugging.  */
-static unsigned octeon_activecores = 0;
+static unsigned long long octeon_activecores = 0;
 /* Controls spawning the simulator. */
 static int octeon_spawn_sim = 0;
 /* With spawn-sim, it controls whether to display the simulator in an
@@ -148,7 +148,7 @@ static int stub_version;
 enum stub_feature { STUB_PERF_EVENT_TYPE };
 
 /* Total number of cores in Octeon. */
-#define MAX_CORES 32
+#define MAX_CORES 48
 
 /* Number of hw instruction and data breakpoints. */
 #define MAX_OCTEON_BREAKPOINTS 4
@@ -273,9 +273,9 @@ from_hex (int a)
   return 0;
 }
 
-static int core_in_mask (unsigned mask, int core)
+static int core_in_mask (unsigned long long mask, int core)
 {
-  return !!(mask & (1u<<core));
+  return !!(mask & (1ull<<core));
 }
 
 /* Send a GDB packet to the target.  */
@@ -1142,11 +1142,12 @@ Give up (and stop debugging it)? "))
    integer value interpreted as hexadecimal value just after REPLY in
    the reply-packet.  On error return ERRORVALUE.  */
 
-static int
+static unsigned long long
 send_command_get_int_reply_generic (char *command, char *reply, int errorValue)
 {
   char packet[PBUFSIZ];
   size_t reply_len = strlen (reply);
+  unsigned long long ret;
 
   make_gdb_packet (packet, command);
 
@@ -1185,13 +1186,13 @@ send_command_get_int_reply_generic (char *command, char *reply, int errorValue)
       error ("Received incorrect reply (expected %s got \"%s\")\n", reply, packet);
       return errorValue;
     }
-  return strtoul (packet + reply_len, NULL, 16);
+  return strtoull (packet + reply_len, NULL, 16);
 }
 
 /* Send a COMMAND to the remote system and get an integer reply. On
    error return ERRORVALUE.  Assumed that response is upper-case
    version of the COMMAND.  */
-static int
+static unsigned long long
 send_command_get_int_reply (char *command, int error)
 {
   char reply[2];
@@ -1272,7 +1273,7 @@ process_watchpoint_packet (char *packet)
     {
       int i, hwwp_hit;
       /* Read which hardware watchpoint is hit.  */
-      hwwp_hit = strtoul (packet+3, NULL, 16) & 0xf;
+      hwwp_hit = strtoull (packet+3, NULL, 16) & 0xf;
       /* Find the address of load/store instruction that caused the 
 	 watchpoint exception.  */
       for (i = 0; i < MAX_OCTEON_BREAKPOINTS; i++)
@@ -2022,11 +2023,11 @@ set_step_isr (int step_isr)
   } while (0)
 
 /*  Parse the CORES list and return the mask. */
-static unsigned
+static unsigned long long
 parse_core_list (char *cores)
 {
   char quoted = 0;
-  unsigned mask = 0;
+  unsigned long long mask = 0;
   char *end;
   int coreid;
 
@@ -2063,7 +2064,10 @@ parse_core_list (char *cores)
 
       coreid = strtol (cores, &end, 10);
 
-      mask |= (1u<<coreid);
+      if (coreid >= MAX_CORES)
+	error ("Core is not in the correct range (0 ... %d)", MAX_CORES-1);
+
+      mask |= (1ull<<coreid);
 
       /* There was no numbers to parse. */
       if (cores == end)
@@ -2108,7 +2112,7 @@ process_mask_command (char *args, int from_tty,
   TRY_CATCH (e, RETURN_MASK_ERROR)
     {
       octeon_activecores = parse_core_list (mask_cores);
-      snprintf (buf, sizeof (buf), "I%04x", octeon_activecores);
+      snprintf (buf, sizeof (buf), "I%04llx", octeon_activecores);
       octeon_activecores = send_command_get_int_reply (buf, octeon_activecores);
     }
 

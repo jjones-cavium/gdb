@@ -1,3 +1,22 @@
+2014-10-29  Andrew Pinski  <apinski@cavium.com>
+
+	Bug #12831
+	* remote-octeon.c (send_command_get_int_reply_generic): Change
+	return type is unsigned long long.
+	Use strtoull instead of strtoul.
+	(octeon_activecores): Change type to unsigned long long.
+	(MAX_CORES): Change to 48.
+	(core_in_mask): Change the mask type to unsigned long long.
+	Also use 1ull instead of 1ul.
+	(send_command_get_int_reply): Change return type to
+	unsigned long long.
+	(process_watchpoint_packet): Use strtoull instead of strtoul.
+	(parse_core_list): Change return type to unsigned long long.
+	Change mask type to unsigned long long.
+	Error out if there is a core which is greater than the MAX_CORES.
+	(process_mask_command): Use %llx when printing out the core mask.
+	
+
 2014-02-07  Andrew Pinski  <apinski@cavium.com>
 
 	* testsuite/gdb.octeon/except-bt-2.c: Fix some warnings.
