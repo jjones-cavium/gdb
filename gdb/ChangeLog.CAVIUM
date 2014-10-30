@@ -1,3 +1,16 @@
+2014-10-30  Andrew Pinski  <apinski@cavium.com>
+
+	Bug #12831
+	Bug #8115
+	* remote-octeon.c (gets_octeondebug_with_handling_prints): New function.
+	(octeon_fetch_registers): Use gets_octeondebug_with_handling_prints
+	instead of gets_octeondebug.
+	(octeon_write_inferior_memory): Use gets_octeondebug_with_handling_prints
+	instead of manual loop.
+	(cache_mem_read): Likewise.
+	(show_performance_counter_event_and_counter): Use gets_octeondebug_with_handling_prints
+	instead of gets_octeondebug.
+
 2014-10-29  Andrew Pinski  <apinski@cavium.com>
 
 	Bug #12831
@@ -15,7 +28,6 @@
 	Change mask type to unsigned long long.
 	Error out if there is a core which is greater than the MAX_CORES.
 	(process_mask_command): Use %llx when printing out the core mask.
-	
 
 2014-02-07  Andrew Pinski  <apinski@cavium.com>
 

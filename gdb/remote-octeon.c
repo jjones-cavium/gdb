@@ -1405,6 +1405,19 @@ octeon_resume (struct target_ops *ops, ptid_t ptid, int step, enum gdb_signal si
   set_resumed_once ();
 }
 
+static void
+gets_octeondebug_with_handling_prints (char *packet)
+{
+  do
+    {
+      if (gets_octeondebug (packet) == 0)
+	error ("couldn't receive packet \n");
+      else if (packet[0] == '!')
+        printf_filtered ("%s\n", packet + 1);
+    }
+   while (packet[0] == '!');
+}
+
 /* Fetch the remote registers. */
 static void
 octeon_fetch_registers (struct target_ops *ops,
@@ -1419,7 +1432,7 @@ octeon_fetch_registers (struct target_ops *ops,
     return;
   make_and_send_packet ("g%04x", regno);
 
-  gets_octeondebug (packet);
+  gets_octeondebug_with_handling_prints (packet);
   /* We got the number the register holds, but gdb expects to see a value 
      in the target byte ordering.  */
   store_unsigned_integer (reg, register_size (gdbarch, regno), byte_order,
@@ -1511,15 +1524,7 @@ octeon_write_inferior_memory (CORE_ADDR memaddr, unsigned char *data,
 	}
       *p = 0;
       make_and_send_packet (buf);
-
-      do
-	{
-	  if (gets_octeondebug (packet) == 0)
-	    error ("couldn't receive packet \n");
-	  else if (packet[0] == '!')
-	    printf_filtered ("%s\n", packet + 1);
-        }
-      while (packet[0] == '!');
+      gets_octeondebug_with_handling_prints (packet);
 
       if (*packet == '-')
         return savedlen - len;
@@ -1560,15 +1565,7 @@ cache_mem_read (CORE_ADDR memaddr, char *myaddr, int len)
       CORE_ADDR memaddr_align = memaddr & -(CORE_ADDR)sizeof(cache_mem_data);
       make_and_send_packet ("m%016llx,%04x", (unsigned long long) memaddr_align,
 			    (int) sizeof (cache_mem_data));
-
-      do
-	{
-	  if (gets_octeondebug (packet) == 0)
-	    error ("couldn't receive packet \n");
-	  else if (packet[0] == '!')
-	    printf_filtered ("%s\n", packet + 1);
-	}
-      while (packet[0] == '!');
+      gets_octeondebug_with_handling_prints (packet);
 
       if (*packet == 0 || *packet == '-')
 	return 0;
@@ -2208,7 +2205,7 @@ show_performance_counter_event_and_counter (int counter)
       else
         make_and_send_packet ("e3");
 
-      gets_octeondebug(packet);
+      gets_octeondebug_with_handling_prints (packet);
 
       perf_counter = strtoul (packet, &packet, 16);
       packet++;
